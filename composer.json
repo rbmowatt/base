@@ -1,0 +1,11 @@
+{
+    "name": "ngair/base",
+    "description": "A set of base components for extension",
+    "authors": [
+        {
+            "name": "Richard Mowatt",
+            "email": "richmowatt@emc.com"
+        }
+    ],
+    "require": {}
+}
