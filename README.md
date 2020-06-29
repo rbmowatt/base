@@ -1,6 +1,7 @@
 # RBMowatt Base
 
 ## Contents
+-  [What It Does](#what-it-does)
 
 -  [Architecture](#architecure)
 
@@ -17,6 +18,15 @@
 -  [Api Response](#apiresponse)
 
 
+## What It Does
+
+The Base Package will allow you to easily scaffold and get a Laravel Api running.
+
+With a few simple configuration variables you can easily set up any number of Controllers/Services and Models that talk to each other while offering a QueryParser and Response Object that standardize the way data is parsed and then returned.
+
+It really is as simple as extending a few classes and near instantly having an api that can handle filters, scopes, relations and sorts.
+
+Just Extend a Service, set a BaseModel for that Service and then have yor Controller use the QueryParser to retrieve the data to be presented to Service in the proper format.
 
 ## Architecure
 
