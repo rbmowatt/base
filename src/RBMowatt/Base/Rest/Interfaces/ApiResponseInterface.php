@@ -1,5 +1,5 @@
 <?php
-namespace RBMowatt\Utilities\Rest\Interfaces;
+namespace RBMowatt\Base\Rest\Interfaces;
 
 interface ApiResponseInterface
 {

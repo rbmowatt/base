@@ -2,19 +2,17 @@
 
 namespace RBMowatt\Base\Controllers\Api;
 
-use App;
-use Auth;
-use App\Http\Controllers\Controller as BaseController;
-use RBMowatt\Utilities\Rest\ApiResponse;
 use Illuminate\Http\Request;
-use RBMowatt\Base\Exceptions\EntityDoesNotExistException;
-use RBMowatt\Base\Services\ServiceResultsCollection;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Auth;
 use RBMowatt\Base\ErrorCodes;
-use RBMowatt\Utilities\Rest\Traits\RestValidationTrait;
+use RBMowatt\Base\Exceptions\EntityDoesNotExistException;
+use RBMowatt\Base\Rest\ApiResponse;
+use RBMowatt\Base\Rest\Traits\RestValidationTrait;
+use RBMowatt\Base\Services\ServiceResultsCollection;
 
-
-
-class BaseApiController extends BaseController
+class BaseApiController extends Controller
 {
     use RestValidationTrait;
 
@@ -22,7 +20,9 @@ class BaseApiController extends BaseController
 
     protected $aclGuard = null;
     protected $hydratedAclGuard = null;
-
+    protected $response;
+    protected $request;
+    protected $user;
 
     public function __construct(ApiResponse $response)
     {

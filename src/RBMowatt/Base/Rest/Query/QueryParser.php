@@ -1,4 +1,4 @@
-<?php namespace RBMowatt\Utilities\Rest\Query;
+<?php namespace RBMowatt\Base\Rest\Query;
 
 use Auth;
 use Cache;

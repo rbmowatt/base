@@ -1,11 +1,49 @@
 {
-    "name": "ngair/base",
-    "description": "A set of base components for extension",
+    "name": "rbmowatt/base",
+    "description": "A set of base components for scaffolding a Laravel REST API: Service, Model, Controller and query-parsing primitives.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "api", "rest", "scaffolding"],
     "authors": [
         {
             "name": "Richard Mowatt",
-            "email": "richmowatt@emc.com"
+            "email": "richmowatt@gmail.com"
         }
     ],
-    "require": {}
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^13.0",
+        "illuminate/database": "^13.0",
+        "illuminate/http": "^13.0",
+        "illuminate/validation": "^13.0",
+        "illuminate/pagination": "^13.0"
+    },
+    "require-dev": {
+        "laravel/framework": "^13.0",
+        "mockery/mockery": "^1.6",
+        "phpunit/phpunit": "^11.0"
+    },
+    "suggest": {
+        "illuminate/auth": "Required by ApiResponse and BaseApiController to resolve the authenticated user."
+    },
+    "autoload": {
+        "psr-4": {
+            "RBMowatt\\Base\\": "src/RBMowatt/Base/"
+        },
+        "files": [
+            "src/RBMowatt/Base/functions.php"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "RBMowatt\\Base\\BaseServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }
