@@ -1,17 +1,14 @@
 <?php namespace RBMowatt\Base\Models;
 
-use DB;
-use Exception;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use JsonSerializable;
 use RBMowatt\Base\Models\Exceptions\ExtraneousDataException;
 use RBMowatt\Base\Models\Interfaces\BaseModelInterface;
 use RBMowatt\Base\Models\Traits\DateCalculationTrait;
 use RBMowatt\Base\Models\Traits\PageAndLimitTrait;
-use RBMowatt\Base\Models\Traits\PlusTheatreTrait;
 use RBMowatt\Base\Models\Traits\RelationshipsTrait;
-use RBMowatt\Utilities\Traits\ReflectionTrait;
-use Schema;
 
 class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
 {
@@ -21,7 +18,6 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
 
   use DateCalculationTrait;
   use PageAndLimitTrait;
-  use ReflectionTrait;
   use RelationshipsTrait;
 
 
@@ -43,7 +39,7 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
   * [jsonSerialize description]
   * @return [type] [description]
   */
-  public function jsonSerialize() {
+  public function jsonSerialize(): mixed {
     return $this->toArray();
   }
 

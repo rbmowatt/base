@@ -8,7 +8,7 @@ use Arrayable;
 class BaseCollection extends Collection
 {
 
-    public function jsonSerialize() {
+    public function jsonSerialize(): array {
         return array_map(function ($value) {
             if ($value instanceof JsonSerializable) {
                 return $value->jsonSerialize();

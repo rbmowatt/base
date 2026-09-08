@@ -13,6 +13,8 @@ class BaseServiceProvider extends ServiceProvider
     */
     public function boot()
     {
-        require_once 'functions.php';
+        // functions.php is pulled in by composer's "files" autoloader, not from here.
+        // Requiring it on boot double-declares its helpers when the provider is
+        // registered more than once (package discovery plus an explicit config entry).
     }
 }
