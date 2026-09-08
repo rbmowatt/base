@@ -1,6 +1,7 @@
 <?php namespace RBMowatt\Base;
 
 use Exception as PhpException;
+use Throwable;
 
 class Exception extends PhpException
 {
@@ -14,15 +15,8 @@ class Exception extends PhpException
     const ALERT = 'alert';
     const EMERGENCY = 'emergency';
 
-    public function __construct($message, $code = null)
+    public function __construct($message, $code = 0, ?Throwable $previous = null)
     {
-        if($code)
-        {
-            parent::__construct($message, $code);
-        }
-        else
-        {
-            parent::__construct($message);
-        }
+        parent::__construct($message, (int) $code, $previous);
     }
 }
