@@ -1,6 +1,6 @@
 <?php
 
-namespace RBMowatt\Utilities\Rest\Exceptions;
+namespace RBMowatt\Base\Rest\Exceptions;
 
 use RBMowatt\Base\Exception;
 

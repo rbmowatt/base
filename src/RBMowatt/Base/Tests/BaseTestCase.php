@@ -2,22 +2,21 @@
 
 namespace RBMowatt\Base\Tests;
 
-/**
-* Base Test Case for air components
-*/
-ini_set("display_errors", 1);
-ini_set("memory_limit", "-1");
-ini_set('error_reporting', E_ALL);
-
-use App;
 use Exception;
-use Mockery as m;
-use Tests\TestCase;
-use \RBMowatt\Base\Tests\Traits\Mockery;
-use \RBMowatt\Base\Tests\Traits\Reflection;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Illuminate\Support\Facades\App;
+use Mockery as m;
+use RBMowatt\Base\Tests\Traits\Mockery;
+use RBMowatt\Base\Tests\Traits\Reflection;
+use Tests\TestCase as LaravelTestCase;
 
-class TestCase extends TestCase
+/**
+* Base Test Case for consuming applications.
+*
+* Extends the host app's Tests\TestCase, so the consuming project must define one
+* (Laravel ships it in tests/TestCase.php); this class is not loadable standalone.
+*/
+abstract class BaseTestCase extends LaravelTestCase
 {
     const EXCEPTION_MESSAGE = 'Test Exception';
 
@@ -25,18 +24,15 @@ class TestCase extends TestCase
     use Reflection;
     use WithoutMiddleware;
 
-    public function setUp()
+    protected $exception;
+
+    protected function setUp(): void
     {
         parent::setUp();
         $this->exception = new Exception(self::EXCEPTION_MESSAGE);
-        //  echo get_class($this) . "::" . $this->getName() . PHP_EOL;
     }
 
-    /**
-    * extends @parent::tearDown
-    * @return void
-    */
-    public function tearDown()
+    protected function tearDown(): void
     {
         parent::tearDown();
         m::close();

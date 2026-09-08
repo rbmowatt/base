@@ -1,8 +1,8 @@
 <?php
 
-namespace RBMowatt\Utilities\Rest\Traits;
+namespace RBMowatt\Base\Rest\Traits;
 
-use RBMowatt\Utilities\Rest\Exceptions\ValidationException;
+use RBMowatt\Base\Rest\Exceptions\ValidationException;
 use Illuminate\Http\Request;
 use Validator;
 

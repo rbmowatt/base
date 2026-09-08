@@ -2,7 +2,7 @@
 
 namespace RBMowatt\Base\Tests\Traits;
 
-use ReflectionClas;
+use ReflectionClass;
 
 trait Reflection
 {
