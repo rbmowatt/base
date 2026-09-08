@@ -24,11 +24,33 @@ class BaseApiController extends Controller
     protected $request;
     protected $user;
 
+    /**
+    * Name of the auth guard used to resolve $user. Null resolves against
+    * auth.defaults.guard. Set it in a subclass to pin a specific guard.
+    */
+    protected $guard = null;
+
     public function __construct(ApiResponse $response)
     {
         $this->response = $response;
         $this->request = App::make(Request::class);
-        $this->user = Auth::guard('api')->user();
+        $this->user = $this->resolveUser();
+    }
+
+    /**
+    * This used to call Auth::guard('api') directly. Laravel 11 dropped the api
+    * guard from the stock config/auth.php, so on a fresh app every subclass threw
+    * "Auth guard [api] is not defined" from its constructor, before any action ran.
+    *
+    * @return mixed the authenticated user, or null when the app has no auth bound
+    */
+    protected function resolveUser()
+    {
+        if (!App::bound('auth'))
+        {
+            return null;
+        }
+        return Auth::guard($this->guard)->user();
     }
 
     public function checkEntityExists($entity)
