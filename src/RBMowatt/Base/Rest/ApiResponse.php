@@ -2,28 +2,40 @@
 
 namespace RBMowatt\Base\Rest;
 
-use Auth;
-use Config;
 use Exception;
-use InvalidArgumentException;
-use Log;
 use Illuminate\Database\QueryException;
-use Illuminate\Http\Response;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Validator;
-use RBMowatt\Base\Exception as BaseException;
+use InvalidArgumentException;
 use RBMowatt\Base\ErrorCodes;
+use RBMowatt\Base\Exception as BaseException;
 use RBMowatt\Base\Rest\Exceptions\ValidationException;
 
-
-Class ApiResponse extends Response //implements ApiResponseInterface
+/**
+* Builds the standard API envelope and renders it as a JsonResponse.
+*
+* This composes a JsonResponse rather than extending Symfony's Response: Response
+* declares setStatusCode(int $code, ?string $text = null): static, so the loose
+* single-argument override this class needs is a fatal signature conflict against
+* any Symfony 6+.
+*/
+class ApiResponse
 {
     protected $_contents = array();
+
+    protected $statusCode = 200;
+
+    protected $headers = array();
 
     const FAILED_VALIDATION_CODE = 422;
 
     public function __construct($content = '', $status = 200, $headers = array())
     {
-        parent::__construct($content, $status, $headers);
+        $this->statusCode = (int) $status;
+        $this->headers = $headers;
         $this->_contents = array(
             'success'=>false,
             'href' => isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI']: 'N/A',
@@ -36,6 +48,9 @@ Class ApiResponse extends Response //implements ApiResponseInterface
             'errorCode'=>NULL,
             'version'=> function_exists('getVersion') ? getVersion() : 'undefined'
         );
+        if ($content !== '' && $content !== null) {
+            $this->_contents['data'] = $content;
+        }
     }
 
     /**
@@ -174,7 +189,7 @@ Class ApiResponse extends Response //implements ApiResponseInterface
     /**
     * Just a different name for toJson
     *
-    * @return string
+    * @return JsonResponse
     */
     public function json()
     {
@@ -189,7 +204,7 @@ Class ApiResponse extends Response //implements ApiResponseInterface
     {
         $this->setUser();
         $this->_contents['statusCode'] = $this->getStatusCode();
-        $jr = new JsonResponse($this->_contents, $this->getStatusCode(), $this->headers->all(),JSON_NUMERIC_CHECK);
+        $jr = new JsonResponse($this->_contents, $this->getStatusCode(), $this->headers, JSON_NUMERIC_CHECK);
         return $jr->withHeaders(['Access-Control-Allow-Origin'=>'*',
         'Access-Control-Allow-Methods'=>'GET, POST, PUT, DELETE, OPTIONS']);
     }
@@ -201,12 +216,8 @@ Class ApiResponse extends Response //implements ApiResponseInterface
     public function toArray()
     {
         $this->setUser();
-        $result = array();
-        foreach ($this as $key => $value)
-        {
-            $result[$key] = $value;
-        }
-        return $result;
+        $this->_contents['statusCode'] = $this->getStatusCode();
+        return $this->_contents;
     }
     /**
      * Set the user data in the response if available
@@ -217,21 +228,44 @@ Class ApiResponse extends Response //implements ApiResponseInterface
     }
 
     /**
+    * Get the current HTTP status code
+    *
+    * @return int
+    */
+    public function getStatusCode()
+    {
+        return $this->statusCode;
+    }
+
+    /**
     * Sets the response status code.
     *
     * @param int   $code HTTP status code
-    * @return Response
+    * @return self
     *
     * @throws InvalidArgumentException When the HTTP status code is not valid
     */
     public function setStatusCode($code)
     {
-        $this->statusCode = $code = (int) $code;
-        $this->_contents['statusCode'] = $code = (int) $code;
-        if ($this->isInvalid())
+        $code = (int) $code;
+        if ($code < 100 || $code >= 600)
         {
             throw new InvalidArgumentException(sprintf('The HTTP status code "%s" is not valid.', $code));
         }
+        $this->statusCode = $code;
+        $this->_contents['statusCode'] = $code;
+        return $this;
+    }
+
+    /**
+    * Add headers that will be attached to the rendered JsonResponse
+    *
+    * @param array $headers
+    * @return self
+    */
+    public function withHeaders(array $headers)
+    {
+        $this->headers = array_merge($this->headers, $headers);
         return $this;
     }
 
@@ -244,7 +278,6 @@ Class ApiResponse extends Response //implements ApiResponseInterface
     public function __set($key, $value)
     {
         $this->_contents[$key] = $value;
-        $this->setContent(json_encode($this->_contents));
     }
 
     /**
@@ -252,9 +285,16 @@ Class ApiResponse extends Response //implements ApiResponseInterface
     *
     * @param string $key
     */
-    public function &__get($key)
+    public function __get($key)
     {
-        return $this->_contents[$key];
+        return array_key_exists($key, $this->_contents) ? $this->_contents[$key] : null;
     }
 
+    /**
+    * @param string $key
+    */
+    public function __isset($key)
+    {
+        return isset($this->_contents[$key]);
+    }
 }

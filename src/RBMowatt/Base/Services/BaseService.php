@@ -2,11 +2,7 @@
 
 namespace RBMowatt\Base\Services;
 
-use App;
-use DB;
-use Elasticsearch\ClientBuilder;
-use Exception;
-use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Support\Facades\App;
 use RBMowatt\Base\ErrorCodes;
 use RBMowatt\Base\Exceptions\EntityDoesNotExistException;
 use RBMowatt\Base\Services\ServiceResultsCollection;
