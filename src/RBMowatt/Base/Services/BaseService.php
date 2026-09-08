@@ -173,7 +173,7 @@ abstract class BaseService implements ServiceInterface
             if (count($filter) !== 3){
                 //where should always be in format [key, '=', value]
                 //if not then Houston we have a problem
-                throw new InvalidWhereFormatException('Invalid Format For Where Clauses' . $filter);
+                throw new InvalidWhereFormatException('Invalid format for where clause: ' . json_encode($filter));
             }
             if ($scope = $this->isScope($filter[0])) {
                 //this means it's a scope rather than a model property, therefore it must be applied as a function

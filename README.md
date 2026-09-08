@@ -252,6 +252,16 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 ### APIResponse
 
+#### Breaking changes to the envelope
+
+If you are upgrading an app that already consumes this package, three things changed:
+
+*  `success` is now always a real boolean. The error path used to emit the **string** `"true"` on success and the boolean `false` on failure, so a client doing a strict comparison saw two different types depending on the outcome.
+
+*  Values are no longer coerced by `JSON_NUMERIC_CHECK`. Any numeric-looking string in the payload used to be rewritten on the way out: `"07005"` shipped as `7005`, `"000123"` as `123`, `"1.10"` as `1.1`, and an id past `2^53` came back as a number a JavaScript client cannot parse without losing the last digits. Strings now ship as strings. If a client relied on receiving numbers, cast on the client.
+
+*  `error()` defaults to a `400` status instead of `200`. Pass the status explicitly if you want something else. `exception()` still defaults to `500` and `validationError()` to `422`.
+
 An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standardized format and include the following properties
 
 *  `success`
