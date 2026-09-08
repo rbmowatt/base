@@ -43,7 +43,10 @@ class ApiResponse
             'uid'=>  NULL,
             'time' => date('y-m-d H:i:s'),
             'statusCode' => $status,
-            'responseId' => md5(time()),
+            // 32 hex chars, same shape md5(time()) produced, so log greps keep working.
+            // md5(time()) handed every response in the same second an identical id,
+            // which made responseId useless for correlating a request with its logs.
+            'responseId' => bin2hex(random_bytes(16)),
             'error' => NULL,
             'errorCode'=>NULL,
             'version'=> function_exists('getVersion') ? getVersion() : 'undefined'
@@ -127,16 +130,20 @@ class ApiResponse
     /**
     * Theres been an error but we dont want to send back a 500
     *
+    * Defaults to 400, not 200: a 200 carrying an error body makes every caller
+    * parse the envelope to find out the call failed, and defeats retry and
+    * alerting rules that key off the status code.
+    *
     * @param mixed $error
     * @param bool $success
     * @param mixed $data
     * @param int $statusCode
     * @return JsonResponse
     */
-    public function error($error, $success = false, $data = [], $statusCode = 200)
+    public function error($error, $success = false, $data = [], $statusCode = 400)
     {
         $this->error = $error;
-        $this->success = ($success) ? 'true' : false;
+        $this->success = (bool) $success;
         $this->data = $data;
         $this->setStatusCode($statusCode);
         return $this->toJson();
@@ -166,14 +173,22 @@ class ApiResponse
         return $this->toJson();
     }
     /**
-    * Let's make this pretty
+    * Render an exception for the `error` field.
+    *
+    * Reads app.debug rather than env('APP_ENV'): once the host app runs
+    * config:cache, env() outside of config files returns null, so an
+    * env-based check silently picks the wrong branch in production.
     *
     * @param Exception $e
     * @return string
     */
     public function formatException(Exception $e)
     {
-        return (env('APP_ENV')!== 'production') ? $e->getMessage() : $e->getMessage() . ', FILE:: ' . $e->getFile() . ', LINE:: ' . $e->getLine();
+        if (!Config::get('app.debug', false))
+        {
+            return $e->getMessage();
+        }
+        return $e->getMessage() . ', FILE:: ' . $e->getFile() . ', LINE:: ' . $e->getLine();
     }
     /**
     * Set the data manually
@@ -204,7 +219,10 @@ class ApiResponse
     {
         $this->setUser();
         $this->_contents['statusCode'] = $this->getStatusCode();
-        $jr = new JsonResponse($this->_contents, $this->getStatusCode(), $this->headers, JSON_NUMERIC_CHECK);
+        // No JSON_NUMERIC_CHECK: it coerced every numeric-looking string in the
+        // payload, so "07005" shipped as 7005, "1.10" as 1.1, and ids past
+        // 2^53 landed outside what a JS client can parse back without loss.
+        $jr = new JsonResponse($this->_contents, $this->getStatusCode(), $this->headers);
         return $jr->withHeaders(['Access-Control-Allow-Origin'=>'*',
         'Access-Control-Allow-Methods'=>'GET, POST, PUT, DELETE, OPTIONS']);
     }
