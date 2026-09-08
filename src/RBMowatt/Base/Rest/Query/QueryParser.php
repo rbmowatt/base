@@ -1,13 +1,15 @@
 <?php namespace RBMowatt\Base\Rest\Query;
 
-use Auth;
-use Cache;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use RBMowatt\Base\Rest\Exceptions\MissingParameterException;
 
 class QueryParser
 {
+  protected Request $request;
+
+
   /*
   A set of keys that are reserved and when encountered will always be used to tigger mapping function
   */
@@ -137,7 +139,7 @@ class QueryParser
     $wheres = $this->makeWheres($filters);
     //the following handles the rest of the keys ex : ?key1=val1&key2=val2
       if ($type == 'filter') {
-          $a = array_except($this->request->input(), array_merge($this->reservedKeys, $without));
+          $a = Arr::except($this->request->input(), array_merge($this->reservedKeys, $without));
           $ext = array_merge($customWheres, array_map(function ($k, $v) {
               return [$k, '=', $v];
           }, array_keys($a), $a));
@@ -203,6 +205,13 @@ class QueryParser
   {
     $fn = function($k)
     {
+      // A where can arrive with no value at all (`?foo=`), with no operator to split
+      // on (`where=[bad]`, which BaseService rejects later), or with an array value
+      // for an IN clause. None of those carry a leading `<` or `>` to lift out.
+      if (!isset($k[2]) || !is_string($k[2]) || $k[2] === '')
+      {
+        return $k;
+      }
       $s = $k[2][0];
       if (in_array($s, ['<', '>']))
       {
