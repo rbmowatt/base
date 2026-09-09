@@ -1,11 +1,13 @@
 <?php namespace RBMowatt\Base\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use JsonSerializable;
 use RBMowatt\Base\Models\Exceptions\ExtraneousDataException;
+use RBMowatt\Base\Models\Exceptions\SoftDeletesNotEnabledException;
 use RBMowatt\Base\Models\Interfaces\BaseModelInterface;
 use RBMowatt\Base\Models\Traits\DateCalculationTrait;
 use RBMowatt\Base\Models\Traits\PageAndLimitTrait;
@@ -89,10 +91,22 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
     return Arr::only($args, $this->columns());
   }
 
+  /**
+  * Soft delete through Eloquent rather than by hand.
+  *
+  * @return bool|null
+  * @throws SoftDeletesNotEnabledException when the model has no SoftDeletes trait
+  */
   public function softDelete()
   {
-    $this->deleted_at = date(STANDARD_DATE_FORMAT);
-    $this->save();
+    if (!in_array(SoftDeletes::class, class_uses_recursive(static::class), true))
+    {
+      throw new SoftDeletesNotEnabledException(
+        static::class . ' does not use ' . SoftDeletes::class
+        . ', so it cannot be soft deleted. Add the trait and a deleted_at column, or call delete().'
+      );
+    }
+    return $this->delete();
   }
 
 }
