@@ -105,7 +105,13 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 		-  [https://laravel.com/docs/5.5/routing](https://laravel.com/docs/5.5/routing)
 
-	- Extend [BaseApiContoller.php](src/RBMowatt/Base/Controllers/Api/AirBaseApiController.php)
+	- Extend [BaseApiContoller.php](src/RBMowatt/Base/Controllers/Api/BaseApiController.php)
+
+	-  **Breaking:** `$this->user` now resolves against `auth.defaults.guard`. It used to hardcode the `api` guard, which Laravel 11 removed from the stock `config/auth.php`, so a fresh app threw `Auth guard [api] is not defined` from the constructor of every subclass. If you were relying on the implicit `api` guard, set it explicitly:
+
+		```php
+		protected $guard = 'api';
+		```
 
 	- Should **ALWAYS** have their **Dependencies** injected
 
