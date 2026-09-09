@@ -54,7 +54,11 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
   */
   public function columns()
   {
-    return Cache::remember($this->table . '_tbl', 60 * 24, function () {
+    // Keyed off getTable(), not the $table property: the property is null on any
+    // model that lets Eloquent derive its table name, so every one of them shared
+    // the key '_tbl' and served each other's column lists. The TTL is seconds
+    // (Laravel 5.8 changed it from minutes), so 60 * 24 was 24 minutes, not a day.
+    return Cache::remember('rbmowatt_base_columns_' . $this->getTable(), 60 * 60 * 24, function () {
       return Schema::getColumnListing($this->getTable());
     });
   }
