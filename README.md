@@ -223,6 +223,8 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 * Set `$fillable` (or `$guarded`) like any Eloquent model, a Service `create()` goes through mass assignment
 
+* `softDelete()` delegates to Eloquent, so the model needs `use SoftDeletes;` and a `deleted_at` column. Without the trait it throws rather than writing a column nothing scopes on
+
 * Because of the large size certain relations and methods are generally split into a few **Traits** that also include other related relations and methods
 
 	*  [RelationshipsTrait](src/RBMowatt/Base/Models/Traits/RelationshipsTrait.php)

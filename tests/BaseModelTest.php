@@ -5,7 +5,9 @@ namespace RBMowatt\BaseTests;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use RBMowatt\Base\Models\BaseModel;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use RBMowatt\Base\Models\Exceptions\ExtraneousDataException;
+use RBMowatt\Base\Models\Exceptions\SoftDeletesNotEnabledException;
 use RBMowatt\Base\Models\Exceptions\InvalidDateFormatException;
 
 class Widget extends BaseModel
@@ -23,6 +25,15 @@ class Gadget extends BaseModel
 
 class Doodad extends BaseModel
 {
+}
+
+class Trashable extends BaseModel
+{
+    use SoftDeletes;
+
+    protected $table = 'trashables';
+
+    protected $fillable = ['name'];
 }
 
 class BaseModelTest extends TestCase
@@ -56,6 +67,13 @@ class BaseModelTest extends TestCase
             $table->id();
             $table->string('colour');
         });
+
+        Schema::create('trashables', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->softDeletes();
+            $table->timestamps();
+        });
     }
 
     public function testModelsWithADerivedTableNameDoNotShareAColumnCache(): void
@@ -85,6 +103,51 @@ class BaseModelTest extends TestCase
     public function testFilterOnAnEmptyPayload(): void
     {
         $this->assertSame([], (new Widget())->filter([]));
+    }
+
+    public function testSoftDeleteHidesTheRowAndKeepsItRestorable(): void
+    {
+        $row = Trashable::create(['name' => 'bin me']);
+
+        $row->softDelete();
+
+        $this->assertSame(0, Trashable::count());
+        $this->assertSame(1, Trashable::onlyTrashed()->count());
+        $this->assertNotNull(Trashable::withTrashed()->find($row->id)->deleted_at);
+
+        Trashable::onlyTrashed()->first()->restore();
+
+        $this->assertSame(1, Trashable::count());
+    }
+
+    public function testSoftDeleteFiresTheDeletingEvents(): void
+    {
+        $seen = [];
+        Trashable::deleting(function () use (&$seen) { $seen[] = 'deleting'; });
+        Trashable::deleted(function () use (&$seen) { $seen[] = 'deleted'; });
+
+        Trashable::create(['name' => 'bin me'])->softDelete();
+
+        $this->assertSame(['deleting', 'deleted'], $seen);
+
+        Trashable::flushEventListeners();
+    }
+
+    public function testSoftDeleteRefusesAModelWithoutTheTrait(): void
+    {
+        $widget = new Widget();
+        $widget->timestamps = false;
+        $widget->name = 'stays put';
+        $widget->save();
+
+        try {
+            $widget->softDelete();
+            $this->fail('a model with no SoftDeletes trait was allowed to soft delete');
+        } catch (SoftDeletesNotEnabledException $e) {
+            $this->assertStringContainsString('SoftDeletes', $e->getMessage());
+        }
+
+        $this->assertSame(1, Widget::count());
     }
 
     public function testValidateAcceptsOnlyRealColumns(): void
