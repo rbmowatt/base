@@ -1,6 +1,7 @@
 <?php namespace RBMowatt\Base\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use JsonSerializable;
@@ -78,7 +79,7 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
   */
   public function filter(array $args)
   {
-    return array_only($args, $this->columns());
+    return Arr::only($args, $this->columns());
   }
 
   public function softDelete()
