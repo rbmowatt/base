@@ -65,9 +65,12 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
   */
   public function validate( array $args)
   {
-    if(!array_intersect(array_keys($args), $this->columns()) == $args)
+    // This was `!array_intersect(...) == $args`, and `!` binds tighter than `==`,
+    // so it compared a bool to the payload. A payload holding one real column plus
+    // any number of junk keys came out valid.
+    if($extraneous = array_diff(array_keys($args), $this->columns()))
     {
-      throw new ExtraneousDataException('Invalid Arguments');
+      throw new ExtraneousDataException('Invalid Arguments: ' . implode(', ', $extraneous));
     }
     return true;
   }

@@ -5,6 +5,7 @@ namespace RBMowatt\BaseTests;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use RBMowatt\Base\Models\BaseModel;
+use RBMowatt\Base\Models\Exceptions\ExtraneousDataException;
 use RBMowatt\Base\Models\Exceptions\InvalidDateFormatException;
 
 class Widget extends BaseModel
@@ -47,6 +48,27 @@ class BaseModelTest extends TestCase
     public function testFilterOnAnEmptyPayload(): void
     {
         $this->assertSame([], (new Widget())->filter([]));
+    }
+
+    public function testValidateAcceptsOnlyRealColumns(): void
+    {
+        $this->assertTrue((new Widget())->validate(['name' => 'a widget']));
+        $this->assertTrue((new Widget())->validate([]));
+    }
+
+    public function testValidateRejectsAPayloadMixingRealAndJunkKeys(): void
+    {
+        $this->expectException(ExtraneousDataException::class);
+        $this->expectExceptionMessage('bogus');
+
+        (new Widget())->validate(['name' => 'a widget', 'bogus' => 1]);
+    }
+
+    public function testValidateRejectsAWhollyJunkPayload(): void
+    {
+        $this->expectException(ExtraneousDataException::class);
+
+        (new Widget())->validate(['bogus' => 1]);
     }
 
     public function testRelativeDatesAreResolved(): void
