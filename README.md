@@ -2,12 +2,16 @@
 
 [![tests](https://github.com/rbmowatt/base/actions/workflows/tests.yml/badge.svg)](https://github.com/rbmowatt/base/actions/workflows/tests.yml)
 
+Scaffold a Laravel 13 REST API from a base Service, Model and Controller. Filtering, relations, sorting and pagination come off the query string, and every response goes back in the same envelope.
+
 Requires PHP 8.3 or 8.4 and Laravel 13.
 
 ## Contents
+-  [Install](#install)
+
 -  [What It Does](#what-it-does)
 
--  [Architecture](#architecure)
+-  [Architecture](#architecture)
 
 -  [Services](#services)
 
@@ -21,6 +25,24 @@ Requires PHP 8.3 or 8.4 and Laravel 13.
 
 -  [Api Response](#apiresponse)
 
+-  [Tests](#tests)
+
+
+## Install
+
+Not on Packagist yet, so point composer at the repo:
+
+```json
+"repositories": [
+    { "type": "vcs", "url": "https://github.com/rbmowatt/base" }
+]
+```
+
+```
+composer require rbmowatt/base:dev-master
+```
+
+The service provider is picked up by package discovery, so there is nothing to add to your config.
 
 ## What It Does
 
@@ -30,15 +52,81 @@ With a few simple configuration variables you can easily set up any number of Co
 
 It really is as simple as extending a few classes and near instantly having an api that can handle filters, scopes, relations and sorts.
 
-Just Extend a Service, set a BaseModel for that Service and then have yor Controller use the QueryParser to retrieve the data to be presented to Service in the proper format.
+Just Extend a Service, set a BaseModel for that Service and then have your Controller use the QueryParser to retrieve the data to be presented to Service in the proper format.
 
-## Architecure
+In full, that is three small classes:
+
+```php
+class Widget extends BaseModel
+{
+    protected $table = 'widgets';
+
+    // Eloquent still guards mass assignment, so a Service create() needs this
+    protected $fillable = ['name', 'type_id'];
+}
+```
+
+```php
+class WidgetService extends BaseService
+{
+    // filter params that map to a scope instead of a column
+    protected $scopes = ['widget.type.id' => 'byWidgetType'];
+
+    // sort params that map to a scope instead of a column
+    protected $sortScopes = [];
+
+    public function __construct(Widget $widget)
+    {
+        $this->primaryModel = $widget;
+    }
+}
+```
+
+```php
+class WidgetController extends BaseApiController
+{
+    protected $queryParser;
+    protected $widgets;
+
+    public function __construct(ApiResponse $response, QueryParser $queryParser, WidgetService $widgets)
+    {
+        parent::__construct($response);
+        $this->queryParser = $queryParser;
+        $this->widgets = $widgets;
+    }
+
+    public function index()
+    {
+        try
+        {
+            $result = $this->widgets->where(
+                $this->queryParser->getWheres(),
+                [],
+                $this->queryParser->getSorts(),
+                $this->queryParser->getSelects(),
+                $this->queryParser->getLimit(),
+                $this->queryParser->getPage()
+            );
+
+            return $this->response->setMeta($result->getMeta())->ok($result->items());
+        }
+        catch(Exception $e)
+        {
+            return $this->response->exception($e);
+        }
+    }
+}
+```
+
+That is a working `GET /api/widget` with `?type_id=2`, `?sort=name_DESC`, `?limit=20&page=2` and the standard envelope, no further wiring.
+
+## Architecture
 
 As the API contains no views we will use what I will call an **MSC** Pattern.
 
 In this pattern a **Controller** will never communicate directly with a **Model** but instead use an intermediary **Service** to store and retrieve data.
 
-All **Requests** are handled by **Controllers** and will always return an instance of **[ApiResponse]()**
+All **Requests** are handled by **Controllers** and will always return an instance of **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)**
 
 ### Services
 
@@ -52,6 +140,8 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 		*  `protected $sortScopes`
 
+		*  declare it on every Service even when empty, a sort that isn't a column looks it up and an undeclared property throws
+
 * map and expose additional **Filter Scopes** to the client method 
 	* solves issue of how do I Filter on properties foreign to the database definition of the object?
 
@@ -61,11 +151,11 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	*  **Primary Model** represents the **Model** that a **Service** will perform its request upon unless told otherwise and allows us to implement inheritance from a **[Base Service](src/RBMowatt/Base/Services/BaseService.php)**.
 
-* Any Service method is welcome to use any Model or Service to gather the information however I have tried to minimize using Models to acheive things I could do with other Services.
+* Any Service method is welcome to use any Model or Service to gather the information however I have tried to minimize using Models to achieve things I could do with other Services.
 
 * The Primary Model should
 
-	* Descend From **[Base Model](src/RBMowatt/Base/Services/BaseService.php)**
+	* Descend From **[Base Model](src/RBMowatt/Base/Models/BaseModel.php)**
 
 *  **[BaseService.php](src/RBMowatt/Base/Services/BaseService.php)**
 
@@ -107,7 +197,7 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	- Follow **Laravel** conventions in terms of routing
 
-		-  [https://laravel.com/docs/5.5/routing](https://laravel.com/docs/5.5/routing)
+		-  [https://laravel.com/docs/13.x/routing](https://laravel.com/docs/13.x/routing)
 
 	- Extend [BaseApiContoller.php](src/RBMowatt/Base/Controllers/Api/BaseApiController.php)
 
@@ -129,13 +219,17 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 * Follow same rules as **Laravel**  **Eloquent**
 
-	*  [https://laravel.com/docs/5.5/eloquent](https://laravel.com/docs/5.5/eloquent)
+	*  [https://laravel.com/docs/13.x/eloquent](https://laravel.com/docs/13.x/eloquent)
+
+* Set `$fillable` (or `$guarded`) like any Eloquent model, a Service `create()` goes through mass assignment
 
 * Because of the large size certain relations and methods are generally split into a few **Traits** that also include other related relations and methods
 
-	* SortOrderTrait
+	*  [RelationshipsTrait](src/RBMowatt/Base/Models/Traits/RelationshipsTrait.php)
 
-	* Relations Trait
+	*  [PageAndLimitTrait](src/RBMowatt/Base/Models/Traits/PageAndLimitTrait.php)
+
+	*  [DateCalculationTrait](src/RBMowatt/Base/Models/Traits/DateCalculationTrait.php)
 
 	*  **Traits** are for organization and Reuse
 
@@ -325,4 +419,13 @@ An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standard
 *  `version`
 
 	* displays the version of the api the request is being run against
+
+## Tests
+
+```
+composer install
+vendor/bin/phpunit
+```
+
+CI runs the same suite on PHP 8.3 and 8.4 for every push and pull request.
 
