@@ -29,6 +29,12 @@ abstract class BaseService implements ServiceInterface
     */
     protected $scopes = [];
     /*
+    Same idea as $scopes but for sorts. Declared here because getSortScope() reads it
+    on any sort that isn't a real column, and a Service that didn't define it got
+    "Undefined property" instead of the SortException it should have raised.
+    */
+    protected $sortScopes = [];
+    /*
     By default we will attach the total count of any relations
     This is additional overhead if you don't actually need that meta info
     place any relations you don't need the count for here

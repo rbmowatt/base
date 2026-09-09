@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use RBMowatt\Base\Models\BaseModel;
 use RBMowatt\Base\Services\BaseService;
 use RBMowatt\Base\Services\Exceptions\InvalidRelationException;
+use RBMowatt\Base\Services\Exceptions\SortException;
 
 class Gizmo extends BaseModel
 {
@@ -156,6 +157,33 @@ class BaseServiceTest extends TestCase
         $this->assertSame([], $errors);
 
         return $result;
+    }
+
+    public function testAnUnmappedSortRaisesSortExceptionNotUndefinedProperty(): void
+    {
+        $errors = [];
+        set_error_handler(function ($number, $message) use (&$errors) {
+            $errors[] = $message;
+            return true;
+        });
+
+        try {
+            $this->service()->where([], [], [['not_a_column', 'ASC']]);
+            $this->fail('expected a SortException');
+        } catch (SortException $e) {
+            $this->assertStringContainsString('not_a_column', $e->getMessage());
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $errors);
+    }
+
+    public function testSortingOnARealColumnStillWorks(): void
+    {
+        $results = $this->service()->where([], [], [['name', 'DESC']]);
+
+        $this->assertSame(['beta', 'alpha'], $results->items()->pluck('name')->all());
     }
 
     public function testWhereStillWorksWithNoRelations(): void
