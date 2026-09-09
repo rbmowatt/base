@@ -29,6 +29,27 @@ class ApiResponseTest extends TestCase
         $this->assertSame('boom', $formatted);
     }
 
+    public function testUidIsNullWithoutAnAuthBinding(): void
+    {
+        $this->app->offsetUnset('auth');
+
+        $this->assertNull((new ApiResponse())->ok([])->getData(true)['uid']);
+    }
+
+    public function testUidComesFromTheAuthenticatedUser(): void
+    {
+        $user = new \Illuminate\Foundation\Auth\User();
+        $user->id = 42;
+        $this->actingAs($user);
+
+        $this->assertSame(42, (new ApiResponse())->ok([])->getData(true)['uid']);
+    }
+
+    public function testMakeIsCallableStatically(): void
+    {
+        $this->assertInstanceOf(ApiResponse::class, ApiResponse::make());
+    }
+
     public function testResponseIdIsUniquePerResponse(): void
     {
         $ids = [];

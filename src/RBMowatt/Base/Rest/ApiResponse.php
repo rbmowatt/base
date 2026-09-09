@@ -5,6 +5,7 @@ namespace RBMowatt\Base\Rest;
 use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
@@ -61,7 +62,7 @@ class ApiResponse
     *
     * @return self
     */
-    public function make()
+    public static function make()
     {
         return new self;
     }
@@ -242,7 +243,11 @@ class ApiResponse
      */
     protected function setUser()
     {
-        $this->_contents['uid'] = Auth::check() ? Auth::user()->id : null;
+        // illuminate/auth is a suggest, not a require. Without the binding the
+        // facade raises "Target class [auth] does not exist" and takes down every
+        // response, not just the authenticated ones. Auth::id() also avoids
+        // assuming the user model exposes an `id` property.
+        $this->_contents['uid'] = App::bound('auth') ? Auth::id() : null;
     }
 
     /**
