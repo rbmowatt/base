@@ -225,6 +225,8 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 * `softDelete()` delegates to Eloquent, so the model needs `use SoftDeletes;` and a `deleted_at` column. Without the trait it throws rather than writing a column nothing scopes on
 
+* Give relation methods a return type (`: HasMany`, `: BelongsTo`, and so on). Relations are discovered from the declared type, never by calling methods to see what they return, so an untyped relation is invisible and `?with=` will reject it as unknown
+
 * Because of the large size certain relations and methods are generally split into a few **Traits** that also include other related relations and methods
 
 	*  [RelationshipsTrait](src/RBMowatt/Base/Models/Traits/RelationshipsTrait.php)
