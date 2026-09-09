@@ -1,8 +1,9 @@
 <?php
+
 namespace Example\Models\Interfaces;
 
-use MowattMedia\Base\Models\Interfaces\BaseModelInterface;
+use RBMowatt\Base\Models\Interfaces\BaseModelInterface;
 
-interface ExampleModelInterface extends BaseModelInterface {
-
+interface ExampleModelInterface extends BaseModelInterface
+{
 }

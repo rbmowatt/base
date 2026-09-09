@@ -129,6 +129,15 @@ class QueryParser
     return $filters;
   }
   /**
+  * get the relations to eager load
+  * accepts ?with=[a,b] and ?with[]=a&with[]=b
+  * @return array
+  */
+  public function getWith()
+  {
+    return is_array($f = $this->request->input('with')) ? $f : $this->convertToArray($f);
+  }
+  /**
   * [getWheres description]
   * @return [type] [description]
   */

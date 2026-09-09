@@ -12,6 +12,8 @@ use RBMowatt\Base\Services\Exceptions\InvalidRelationException;
 use RBMowatt\Base\Services\Exceptions\InvalidWhereFormatException;
 use RBMowatt\Base\Services\Exceptions\SortException;
 use RBMowatt\Base\Services\Interfaces\ServiceInterface;
+use ReflectionClass;
+use ReflectionMethod;
 
 
 
@@ -26,6 +28,12 @@ abstract class BaseService implements ServiceInterface
     filter params that don't live on the DB schema
     */
     protected $scopes = [];
+    /*
+    Same idea as $scopes but for sorts. Declared here because getSortScope() reads it
+    on any sort that isn't a real column, and a Service that didn't define it got
+    "Undefined property" instead of the SortException it should have raised.
+    */
+    protected $sortScopes = [];
     /*
     By default we will attach the total count of any relations
     This is additional overhead if you don't actually need that meta info
@@ -103,6 +111,26 @@ abstract class BaseService implements ServiceInterface
         return new ServiceResultsCollection($this->primaryModel, $result);
     }
     /** 
+    * Create an instance based on provided params
+    * @param array $params an array of key values to be applied to the entity
+    * @param mixed $callback provide a function to be caled AFTER entity saves
+    * @return BaseModel
+    */
+    /**
+     * Count the rows matching a set of where clauses.
+     *
+     * Takes the same $wheres QueryParser::getWheres() produces, and runs COUNT
+     * rather than fetching a page, so it stays cheap on large tables. Relations,
+     * sorts and selects are all pointless here and are not accepted.
+     *
+     * @param array $wheres
+     * @return int
+     */
+    public function getCountWhere($wheres = [])
+    {
+        return $this->setWheres($this->primaryModel->newQuery(), $wheres)->count();
+    }
+    /**
     * Create an instance based on provided params
     * @param array $params an array of key values to be applied to the entity
     * @param mixed $callback provide a function to be caled AFTER entity saves
@@ -290,7 +318,10 @@ abstract class BaseService implements ServiceInterface
     {
         $selects = [];
         foreach ($columns as $property) {
-            $selects[] = (stristr($property, '.')) ? $c : implode('.', [$model->getTable(), $property]);
+            // an already-qualified column passes through; $c here was an undefined
+            // variable, so a dotted select produced null and three null-argument
+            // deprecations on the way down into the query builder
+            $selects[] = (stristr($property, '.')) ? $property : implode('.', [$model->getTable(), $property]);
         }
         if (count($selects)) {
             //selects were added to append them to query and move on
@@ -324,22 +355,37 @@ abstract class BaseService implements ServiceInterface
      * @param  array $withs 
      * @return array        
      */
+    /**
+     * This used to call getMethods() on whatever eagerLoad handed it, which by then
+     * is an Eloquent Builder, not a ReflectionClass. Every ?with= request died on
+     * "Call to undefined method Illuminate\Database\Eloquent\Builder::getMethods()".
+     * It also compared the whole dotted path against method names, so a nested
+     * relation could never match. Only the root has to resolve on the model.
+     */
     protected function validateRelations($model, $withs)
     {
-        //$model = $this->primaryModel;
-        //get primary relationship keys
         //get rid of any empty indexes
         $withs = array_filter($withs);
         if (!count($withs)) return [];
-        $className = get_class($model);
+
+        $primary = $this->primaryModel;
+        $className = get_class($primary);
         $methodNamesFn = function ($m) use ($className) {
             return ($m->class == $className) ? $m->name : null;
         };
-        $methodNames = array_filter(array_map($methodNamesFn, $model->getMethods()));
-        $diff = array_diff(array_values($withs), array_values($methodNames));
+        $methodNames = array_filter(array_map(
+            $methodNamesFn,
+            (new ReflectionClass($primary))->getMethods(ReflectionMethod::IS_PUBLIC)
+        ));
+
+        $roots = array_map(function ($with) {
+            return $this->getRelationRoot((!is_array($with)) ? $with : array_keys($with)[0]);
+        }, array_values($withs));
+
+        $diff = array_diff($roots, array_values($methodNames));
         if ($diff) {
             //we havent found a defined relationship for every relationship requested
-            throw new InvalidRelationException($model, $diff);
+            throw new InvalidRelationException($primary, $diff);
         }
         return $withs;
     }

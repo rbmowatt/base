@@ -1,31 +1,29 @@
 <?php
+
 namespace Example\Controllers\Api;
 
 use Exception;
 use Illuminate\Http\Request;
-use Mowattmedia\Base\Controllers\Api\AirBaseApiController as ApiController;
-use Mowattmedia\Base\Rest\ApiResponse;
-use Query\QueryParser;
-use Example\Services\ExampleService as BaseService;
+use RBMowatt\Base\Controllers\Api\BaseApiController;
+use RBMowatt\Base\Rest\ApiResponse;
+use RBMowatt\Base\Rest\Query\QueryParser;
+use Example\Services\ExampleService;
 
-class ExampleApiController extends ApiController
+class ExampleApiController extends BaseApiController
 {
-
-    protected $response;
     protected $queryParser;
-    protected $baseService;
+    protected $exampleService;
 
-    public function __construct(ApiResponse $response, QueryParser $queryParser, BaseService $baseService )
+    public function __construct(ApiResponse $response, QueryParser $queryParser, ExampleService $exampleService)
     {
         parent::__construct($response);
         $this->queryParser = $queryParser;
-        $this->baseService = $baseService;
-
+        $this->exampleService = $exampleService;
     }
+
     /**
-    * [index description]
-    * @return ApiResponse
-    * @throws Exception
+    * List entities
+    * @return \Illuminate\Http\JsonResponse
     */
     public function index()
     {
@@ -33,10 +31,16 @@ class ExampleApiController extends ApiController
         {
             if($this->queryParser->isCount())
             {
-                return $this->response->ok($this->baseService->getCountWhere($this->queryParser->getWheres()));
+                return $this->response->ok($this->exampleService->getCountWhere($this->queryParser->getWheres()));
             }
-            $result = $this->baseService->where($this->queryParser->getWheres(), $this->queryParser->getWith(),
-            $this->queryParser->getSorts(), $this->queryParser->getSelects(), $this->queryParser->getLimit(),$this->queryParser->getPage());
+            $result = $this->exampleService->where(
+                $this->queryParser->getWheres(),
+                $this->queryParser->getWith(),
+                $this->queryParser->getSorts(),
+                $this->queryParser->getSelects(),
+                $this->queryParser->getLimit(),
+                $this->queryParser->getPage()
+            );
             return $this->response->setMeta($result->getMeta())->ok($result->items());
         }
         catch( Exception $e )
@@ -46,67 +50,16 @@ class ExampleApiController extends ApiController
     }
 
     /**
-    * Show All entities
-    * @param  integer $id 
-    * @return ApiResponse
+    * Show a single entity
+    * @param  integer $id
+    * @return \Illuminate\Http\JsonResponse
     */
     public function show($id)
     {
         try
         {
-            $result = $this->baseService->find($id, $this->queryParser->getWith(), $this->queryParser->getSelects());
+            $result = $this->exampleService->find($id, $this->queryParser->getWith(), $this->queryParser->getSelects());
             return $this->response->ok($result);
-        }
-        catch( Exception $e )
-        {
-            return $this->response->exception($e);
-        }
-    }
-    /**
-    * Create A New entity
-    * @param  Request $request
-    * @return ApiResponse
-    */
-    public function store(Request $request)
-    {
-        try
-        {
-            $result = $this->baseService->create($request->all());
-            return $this->response->ok($result);
-        }
-        catch( Exception $e )
-        {
-            return $this->response->exception($e);
-        }
-    }
-    /**
-    * [update description]
-    * @param  integer $id [entities table id]
-    * @param  Request $request
-    * @return ApiResponse
-    */
-    public function update($id, Request $request)
-    {
-        try
-        {
-            $result = $this->baseService->update($this->baseService->find($id), $request->except('id'));
-            return $this->response->ok($result);
-        }
-        catch( Exception $e )
-        {
-            return $this->response->exception($e);
-        }
-    }
-    /**
-    * Delete A entity
-    * @param  integer $id [entities table id]
-    * @return ApiResponse
-    */
-    public function destroy($id)
-    {
-        try
-        {
-            return $this->response->ok($this->baseService->remove($id));
         }
         catch( Exception $e )
         {
@@ -114,4 +67,57 @@ class ExampleApiController extends ApiController
         }
     }
 
+    /**
+    * Create A New entity
+    * @param  Request $request
+    * @return \Illuminate\Http\JsonResponse
+    */
+    public function store(Request $request)
+    {
+        try
+        {
+            $result = $this->exampleService->create($request->all());
+            return $this->response->ok($result);
+        }
+        catch( Exception $e )
+        {
+            return $this->response->exception($e);
+        }
+    }
+
+    /**
+    * Update an entity
+    * @param  integer $id [entities table id]
+    * @param  Request $request
+    * @return \Illuminate\Http\JsonResponse
+    */
+    public function update($id, Request $request)
+    {
+        try
+        {
+            $result = $this->exampleService->update($this->exampleService->find($id), $request->except('id'));
+            return $this->response->ok($result);
+        }
+        catch( Exception $e )
+        {
+            return $this->response->exception($e);
+        }
+    }
+
+    /**
+    * Delete an entity
+    * @param  integer $id [entities table id]
+    * @return \Illuminate\Http\JsonResponse
+    */
+    public function destroy($id)
+    {
+        try
+        {
+            return $this->response->ok($this->exampleService->remove($id));
+        }
+        catch( Exception $e )
+        {
+            return $this->response->exception($e);
+        }
+    }
 }
