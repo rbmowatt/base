@@ -13,6 +13,18 @@ class Widget extends BaseModel
     protected $table = 'widgets';
 }
 
+/**
+ * No $table on purpose: Eloquent derives "gadgets", but the $table property stays
+ * null, which is what used to collapse every such model onto one cache key.
+ */
+class Gadget extends BaseModel
+{
+}
+
+class Doodad extends BaseModel
+{
+}
+
 class BaseModelTest extends TestCase
 {
     protected function defineEnvironment($app)
@@ -33,6 +45,31 @@ class BaseModelTest extends TestCase
             $table->id();
             $table->string('name');
         });
+
+        Schema::create('gadgets', function (Blueprint $table) {
+            $table->id();
+            $table->string('label');
+            $table->integer('weight');
+        });
+
+        Schema::create('doodads', function (Blueprint $table) {
+            $table->id();
+            $table->string('colour');
+        });
+    }
+
+    public function testModelsWithADerivedTableNameDoNotShareAColumnCache(): void
+    {
+        $this->assertSame(['id', 'label', 'weight'], (new Gadget())->columns());
+        $this->assertSame(['id', 'colour'], (new Doodad())->columns());
+        $this->assertSame(['id', 'label', 'weight'], (new Gadget())->columns());
+    }
+
+    public function testAnExplicitTableStillGetsItsOwnCache(): void
+    {
+        $this->assertSame(['id', 'name'], (new Widget())->columns());
+        $this->assertSame(['id', 'label', 'weight'], (new Gadget())->columns());
+        $this->assertSame(['id', 'name'], (new Widget())->columns());
     }
 
     public function testFilterKeepsOnlyRealColumns(): void
