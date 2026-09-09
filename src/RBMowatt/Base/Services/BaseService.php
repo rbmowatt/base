@@ -62,7 +62,7 @@ abstract class BaseService implements ServiceInterface
      * Get default primary model
      * @return BaseModel 
      */
-    public function getModel($model)
+    public function getModel()
     {
         return $this->primaryModel;
     }

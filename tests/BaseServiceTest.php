@@ -39,6 +39,15 @@ class GizmoService extends BaseService
 
 class BaseServiceTest extends TestCase
 {
+    public function testGetModelTakesNoArgument(): void
+    {
+        $service = new GizmoService(new Gizmo());
+        $swapped = new GizmoPart();
+
+        $this->assertInstanceOf(Gizmo::class, $service->getModel());
+        $this->assertSame($swapped, $service->setModel($swapped)->getModel());
+    }
+
     protected function defineEnvironment($app)
     {
         $app['config']->set('database.default', 'testing');
