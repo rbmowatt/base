@@ -9,11 +9,20 @@ class ServiceResultsCollection
 {
     protected $items;
 
+    protected $results;
+
     public function __construct($model, $results)
     {
         $this->results = $results;
         //first we have to figure out what method we need to call to get our base collection
         //Query Bulider will return plain objects on raw queries
+        if(!is_object($results))
+        {
+            // method_exists() is a TypeError on an array in PHP 8, which made the
+            // raw-data branch below unreachable for the one input type it names.
+            $this->items = $results;
+            return;
+        }
         if(method_exists($results, 'getCollection'))
         {
             //it's a collection
@@ -35,7 +44,7 @@ class ServiceResultsCollection
     */
     public function getMeta($property = null)
     {
-        if (method_exists($this->results, 'total')) {
+        if (is_object($this->results) && method_exists($this->results, 'total')) {
             $meta = [
                 'total'         => $this->results->total(),
                 'per_page'      => $this->results->perPage(),

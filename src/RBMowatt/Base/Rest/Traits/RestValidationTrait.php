@@ -4,11 +4,16 @@ namespace RBMowatt\Base\Rest\Traits;
 
 use RBMowatt\Base\Rest\Exceptions\ValidationException;
 use Illuminate\Http\Request;
-use Validator;
+use Illuminate\Support\Facades\Validator;
 
 trait RestValidationTrait
 {
-
+    /**
+    * Key that marks the required block of a rule set. This lived on
+    * BaseApiController, so using the trait anywhere else raised an undefined
+    * constant. Classes that use the trait still expose it as their own constant.
+    */
+    const REQUIRED = 'required';
 
     protected function justify(array $required, Request $request, $after = null)
     {
