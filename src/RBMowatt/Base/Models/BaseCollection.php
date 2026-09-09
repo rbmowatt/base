@@ -1,8 +1,8 @@
 <?php namespace RBMowatt\Base\Models;
+use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Database\Eloquent\Collection;
 use JsonSerializable;
-use Jsonable;
-use Arrayable;
 
 
 class BaseCollection extends Collection
