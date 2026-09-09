@@ -1,0 +1,107 @@
+<?php
+
+namespace RBMowatt\BaseTests;
+
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use RBMowatt\Base\Models\BaseModel;
+use RBMowatt\Base\Services\BaseService;
+use RBMowatt\Base\Services\Exceptions\InvalidRelationException;
+
+class Gizmo extends BaseModel
+{
+    protected $table = 'gizmos';
+
+    protected $fillable = ['name', 'type_id'];
+
+    public function parts(): HasMany
+    {
+        return $this->hasMany(GizmoPart::class, 'gizmo_id');
+    }
+}
+
+class GizmoPart extends BaseModel
+{
+    protected $table = 'gizmo_parts';
+
+    protected $fillable = ['gizmo_id', 'label'];
+}
+
+class GizmoService extends BaseService
+{
+    public function __construct(Gizmo $gizmo)
+    {
+        $this->primaryModel = $gizmo;
+    }
+}
+
+class BaseServiceTest extends TestCase
+{
+    protected function defineEnvironment($app)
+    {
+        $app['config']->set('database.default', 'testing');
+        $app['config']->set('database.connections.testing', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ]);
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Schema::create('gizmos', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->integer('type_id');
+            $table->timestamps();
+        });
+
+        Schema::create('gizmo_parts', function (Blueprint $table) {
+            $table->id();
+            $table->integer('gizmo_id');
+            $table->string('label');
+            $table->timestamps();
+        });
+
+        Gizmo::create(['name' => 'alpha', 'type_id' => 1]);
+        Gizmo::create(['name' => 'beta', 'type_id' => 2]);
+        GizmoPart::create(['gizmo_id' => 1, 'label' => 'bolt']);
+        GizmoPart::create(['gizmo_id' => 1, 'label' => 'nut']);
+
+        $_SERVER['REQUEST_URI'] = '/api/gizmo';
+    }
+
+    private function service(): GizmoService
+    {
+        return new GizmoService(new Gizmo());
+    }
+
+    public function testEagerLoadsARequestedRelation(): void
+    {
+        $results = $this->service()->where([], ['parts']);
+
+        $first = $results->items()->first();
+
+        $this->assertTrue($first->relationLoaded('parts'));
+        $this->assertCount(2, $first->parts);
+        $this->assertSame(2, $first->parts_count);
+    }
+
+    public function testAnUnknownRelationIsRejected(): void
+    {
+        $this->expectException(InvalidRelationException::class);
+
+        $this->service()->where([], ['not_a_relation']);
+    }
+
+    public function testWhereStillWorksWithNoRelations(): void
+    {
+        $results = $this->service()->where([['type_id', '=', 2]]);
+
+        $this->assertSame(1, $results->count());
+        $this->assertSame('beta', $results->items()->first()->name);
+    }
+}
