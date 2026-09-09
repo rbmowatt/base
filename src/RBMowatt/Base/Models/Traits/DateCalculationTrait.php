@@ -1,6 +1,6 @@
 <?php namespace RBMowatt\Base\Models\Traits;
 
-use RBMowatt\Base\Models\Exception\InvalidDateFormatException;
+use RBMowatt\Base\Models\Exceptions\InvalidDateFormatException;
 
 trait DateCalculationTrait
 {

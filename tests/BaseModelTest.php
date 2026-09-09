@@ -5,6 +5,7 @@ namespace RBMowatt\BaseTests;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use RBMowatt\Base\Models\BaseModel;
+use RBMowatt\Base\Models\Exceptions\InvalidDateFormatException;
 
 class Widget extends BaseModel
 {
@@ -46,5 +47,44 @@ class BaseModelTest extends TestCase
     public function testFilterOnAnEmptyPayload(): void
     {
         $this->assertSame([], (new Widget())->filter([]));
+    }
+
+    public function testRelativeDatesAreResolved(): void
+    {
+        $this->assertSame(
+            date('Y-m-d 00:00:00', strtotime('-3 days')),
+            $this->calculateSince('3_days')
+        );
+    }
+
+    public function testTimestampsAndDateStringsAreNormalized(): void
+    {
+        $this->assertSame(
+            date(STANDARD_DATE_FORMAT, 1700000000),
+            $this->calculateSince('1700000000')
+        );
+        $this->assertSame('2026-01-02 00:00:00', $this->calculateSince('2026-01-02'));
+    }
+
+    public function testAnUnparseableDateThrowsTheRightException(): void
+    {
+        $this->expectException(InvalidDateFormatException::class);
+
+        $this->calculateSince('sometime last tuesday');
+    }
+
+    public function testAMalformedRelativeDateThrowsTheRightException(): void
+    {
+        $this->expectException(InvalidDateFormatException::class);
+
+        $this->calculateSince('3_fortnights');
+    }
+
+    private function calculateSince(string $date)
+    {
+        $method = new \ReflectionMethod(Widget::class, 'calculateSinceData');
+        $method->setAccessible(true);
+
+        return $method->invoke(new Widget(), $date);
     }
 }
