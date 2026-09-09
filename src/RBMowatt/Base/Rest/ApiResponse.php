@@ -42,7 +42,7 @@ class ApiResponse
             'href' => isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI']: 'N/A',
             'app' => Config::get('app.name', '[app.name] not set '),
             'uid'=>  NULL,
-            'time' => date('y-m-d H:i:s'),
+            'time' => date('c'),
             'statusCode' => $status,
             // 32 hex chars, same shape md5(time()) produced, so log greps keep working.
             // md5(time()) handed every response in the same second an identical id,

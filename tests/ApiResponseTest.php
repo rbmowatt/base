@@ -116,4 +116,43 @@ class ApiResponseTest extends TestCase
         $this->assertSame(ErrorCodes::NO_IDEA, $payload['errorCode']);
         $this->assertSame(500, $payload['statusCode']);
     }
+
+    public function testTimeIsIso8601WithAnOffset(): void
+    {
+        $time = (new ApiResponse())->ok([])->getData(true)['time'];
+
+        $this->assertNotFalse(\DateTimeImmutable::createFromFormat(DATE_ATOM, $time));
+    }
+
+    public function testNoCorsHeadersAreSet(): void
+    {
+        $headers = (new ApiResponse())->ok([])->headers;
+
+        $this->assertFalse($headers->has('Access-Control-Allow-Origin'));
+        $this->assertFalse($headers->has('Access-Control-Allow-Methods'));
+    }
+
+    public function testExplicitHeadersStillReachTheResponse(): void
+    {
+        $headers = (new ApiResponse())
+            ->withHeaders(['X-Request-Source' => 'test'])
+            ->ok([])
+            ->headers;
+
+        $this->assertSame('test', $headers->get('X-Request-Source'));
+    }
+
+    public function testVersionComesFromAppConfig(): void
+    {
+        Config::set('app.version', '2.4.1');
+
+        $this->assertSame('2.4.1', (new ApiResponse())->ok([])->getData(true)['version']);
+    }
+
+    public function testVersionFallsBackToUndefined(): void
+    {
+        Config::set('app.version', null);
+
+        $this->assertSame('undefined', (new ApiResponse())->ok([])->getData(true)['version']);
+    }
 }

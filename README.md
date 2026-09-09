@@ -370,6 +370,12 @@ If you are upgrading an app that already consumes this package, three things cha
 
 *  `error()` defaults to a `400` status instead of `200`. Pass the status explicitly if you want something else. `exception()` still defaults to `500` and `validationError()` to `422`.
 
+*  `time` is now ISO 8601 with an offset (`2026-09-09T10:15:00-07:00`). It used to be `date('y-m-d H:i:s')` — a two-digit year and no timezone, so `26-09-09 10:15:00` was ambiguous to anything parsing it.
+
+*  No CORS headers are sent. The package used to add `Access-Control-Allow-Origin: *` to every response, which overrode whatever the app's `HandleCors` middleware configured.
+
+*  `version` reads `config('app.version')`. It used to come from a global `getVersion()` helper the package autoloaded, which read a `.app.info.php` file at the project root. That helper and the rest of the package's global helpers are gone.
+
 An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standardized format and include the following properties
 
 *  `success`
@@ -390,7 +396,7 @@ An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standard
 
 *  `time`
 
-	* time the request was received
+	* ISO 8601 timestamp, with offset, of when the response was built
 
 *  `statusCode`
 
@@ -423,6 +429,12 @@ An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standard
 *  `version`
 
 	* displays the version of the api the request is being run against
+
+	* read from `config('app.version')`, which Laravel does not set for you. Add it to `config/app.php` or the field reports `undefined`
+
+### Headers and CORS
+
+`ApiResponse` sets no CORS headers. Cross-origin access is the application's call, not the package's, so configure Laravel's `HandleCors` middleware and `config/cors.php` as usual. Anything you pass to `withHeaders()` on the response is still merged onto the rendered `JsonResponse`.
 
 ## Tests
 
