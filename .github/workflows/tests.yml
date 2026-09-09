@@ -21,6 +21,8 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
+          # The model tests build a real schema, so pdo_sqlite is not optional.
+          extensions: pdo_sqlite, sqlite3
           coverage: none
 
       # composer.lock is gitignored (this is a library, not an app), so the cache

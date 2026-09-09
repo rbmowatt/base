@@ -1,9 +1,7 @@
 <?php namespace RBMowatt\Base\Models\Traits;
 
-use App;
-use ErrorException;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\App;
 use ReflectionClass;
 use ReflectionMethod;
 
@@ -13,6 +11,10 @@ trait RelationshipsTrait
 
     /**
      * Get the models relations list so we can validate when asked
+     *
+     * This invokes every public no-argument method declared directly on the
+     * concrete model to see which ones return a Relation. Inherited methods are
+     * skipped, but anything you add to your own model with side effects will run.
      */
     public function relationships() {
         $model = new static;
@@ -23,18 +25,14 @@ trait RelationshipsTrait
             $method->getName() == __FUNCTION__) {
                 continue;
             }
-            try {
-                $return = $method->invoke($model);
+            $return = $method->invoke($model);
 
-                if ($return instanceof Relation) {
-                    $this->modelRelationships[$method->getName()] = [
-                        'fk'=>$this->getFkProperty($return)->getValue($return),
-                        'type' => (new ReflectionClass($return))->getShortName(),
-                        'model' => (new ReflectionClass($return->getRelated()))->getName()
-                    ];
-                }
-            } catch( Exception $e) {
-                throw $e;
+            if ($return instanceof Relation) {
+                $this->modelRelationships[$method->getName()] = [
+                    'fk'=>$this->getFkProperty($return)->getValue($return),
+                    'type' => (new ReflectionClass($return))->getShortName(),
+                    'model' => (new ReflectionClass($return->getRelated()))->getName()
+                ];
             }
         }
         return $this->modelRelationships;

@@ -16,8 +16,6 @@ class BaseApiController extends Controller
 {
     use RestValidationTrait;
 
-    const REQUIRED = 'required';
-
     protected $aclGuard = null;
     protected $hydratedAclGuard = null;
     protected $response;
