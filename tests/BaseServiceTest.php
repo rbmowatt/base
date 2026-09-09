@@ -121,6 +121,43 @@ class BaseServiceTest extends TestCase
         $this->assertStringNotContainsString('limit', $aggregates[0]);
     }
 
+    public function testBareSelectsAreQualifiedWithTheTable(): void
+    {
+        $results = $this->withoutPhpErrors(fn () => $this->service()->where([], [], [], ['name']));
+
+        $row = $results->items()->first()->toArray();
+
+        $this->assertSame(['name'], array_keys($row));
+    }
+
+    public function testAlreadyQualifiedSelectsPassThrough(): void
+    {
+        $results = $this->withoutPhpErrors(fn () => $this->service()->where([], [], [], ['gizmos.name']));
+
+        $row = $results->items()->first()->toArray();
+
+        $this->assertSame(['name'], array_keys($row));
+    }
+
+    private function withoutPhpErrors(callable $fn)
+    {
+        $errors = [];
+        set_error_handler(function ($number, $message) use (&$errors) {
+            $errors[] = $message;
+            return true;
+        });
+
+        try {
+            $result = $fn();
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $errors);
+
+        return $result;
+    }
+
     public function testWhereStillWorksWithNoRelations(): void
     {
         $results = $this->service()->where([['type_id', '=', 2]]);

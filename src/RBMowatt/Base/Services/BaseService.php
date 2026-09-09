@@ -312,7 +312,10 @@ abstract class BaseService implements ServiceInterface
     {
         $selects = [];
         foreach ($columns as $property) {
-            $selects[] = (stristr($property, '.')) ? $c : implode('.', [$model->getTable(), $property]);
+            // an already-qualified column passes through; $c here was an undefined
+            // variable, so a dotted select produced null and three null-argument
+            // deprecations on the way down into the query builder
+            $selects[] = (stristr($property, '.')) ? $property : implode('.', [$model->getTable(), $property]);
         }
         if (count($selects)) {
             //selects were added to append them to query and move on
