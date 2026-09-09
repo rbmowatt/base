@@ -1,6 +1,6 @@
 <?php namespace RBMowatt\Base\Models\Traits;
 
-use DB;
+use Illuminate\Support\Facades\DB;
 
 trait PageAndLimitTrait
 {

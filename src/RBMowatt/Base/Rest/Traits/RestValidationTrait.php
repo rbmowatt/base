@@ -4,7 +4,7 @@ namespace RBMowatt\Base\Rest\Traits;
 
 use RBMowatt\Base\Rest\Exceptions\ValidationException;
 use Illuminate\Http\Request;
-use Validator;
+use Illuminate\Support\Facades\Validator;
 
 trait RestValidationTrait
 {
