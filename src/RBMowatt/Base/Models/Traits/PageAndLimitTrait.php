@@ -104,15 +104,8 @@ trait PageAndLimitTrait
         */
         public function scopePt($query, $group, $offset=1, $n = 10)
         {
-           $nq = $this->newQuery();
-         // dd($query->getQuery()->joins[0]);
-            //$group = $this->getFk($group);
-            //$
-            // queried table
+            $nq = $this->newQuery();
             $table = ($this->getTable());
-            // make sure column aliases are unique
-            //$groupAlias = 'group_'.md5(time());
-            //$rankAlias  = 'rank_'.md5(time());
             // initialize MySQL variables inline
             $nq->from( DB::raw("(SELECT @rank:=0, @group:=0 ) as vars, {$table}") );
 
@@ -133,8 +126,6 @@ trait PageAndLimitTrait
             ));
 
             $nq->mergeBindings($query->getQuery());
-            //$nq->mergeBindings($query->getQuery());
-            //dd($nq->toSql());
 
             $query->join(DB::raw("({$nq->toSql()}) as t3"), function($join) use ($table){
                 $join->on($table. ".id", '=', "t3.id");
@@ -143,28 +134,5 @@ trait PageAndLimitTrait
             ->where($rankAlias, '<',  ($n  * $offset) + 1);
 
             return $query;
-            //return $nq;
-    dd($query->toSql());
-            // make sure first order clause is the group order
-            $query->getQuery()->orders = (array) $query->getQuery()->orders;
-            array_unshift($query->getQuery()->orders, ['column' => $group, 'direction' => 'asc']);
-            //$query->where($rankAlias, '>', ($offset - 1) * $n)
-            //->where($rankAlias, '<',  ($n  * $offset) + 1);
-
-            // prepare subquery
-            $subQuery = $query->toSql();
-            //dd($subQuery );
-
-            // prepare new main base Query\Builder
-            $newBase = $this->newQuery()
-            ->from(DB::raw("({$subQuery}) as {$table}"))
-            ->mergeBindings($query->getQuery())
-            ->where($rankAlias, '>', ($offset - 1) * $n)
-            ->where($rankAlias, '<',  ($n  * $offset) + 1)
-            ->getQuery();
-
-            // replace underlying builder to get rid of previous clauses
-            //return $query->addSelect($subQuery);
-            return $query->setQuery($newBase);
         }
 }
