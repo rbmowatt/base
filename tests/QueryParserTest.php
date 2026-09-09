@@ -58,6 +58,14 @@ class QueryParserTest extends TestCase
         $this->assertContains(['score', '<', '100'], $wheres);
     }
 
+    public function testWithIsParsedFromBothQueryShapes(): void
+    {
+        $this->assertSame(['owner', 'parts'], $this->parser(['with' => '[owner,parts]'])->getWith());
+        $this->assertSame(['owner', 'parts'], $this->parser(['with' => ['owner', 'parts']])->getWith());
+        $this->assertSame(['owner'], $this->parser(['with' => 'owner'])->getWith());
+        $this->assertSame([], $this->parser([])->getWith());
+    }
+
     public function testSortsAreSplitIntoColumnAndDirection(): void
     {
         $this->assertSame(
