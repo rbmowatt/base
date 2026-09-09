@@ -12,13 +12,11 @@ trait RelationshipsTrait
     protected $modelRelationships = [];
 
     /**
-     * Get the models relations list so we can validate when asked
+     * Get the model relations list so we can validate when asked
      *
      * Relations are found by their declared return type, never by calling a method
-     * to see what comes back. The old version invoked every public no-argument
-     * method on the model, so asking for the relation list ran anything else you
-     * had declared there. The cost of the swap: a relation method with no return
-     * type is not found, and ?with= will reject it as an unknown relation.
+     * to see what comes back.
+     * Note: a relation method with no return type is not found, and ?with= will reject it as an unknown relation.
      */
     public function relationships() {
         $model = new static;
@@ -57,8 +55,7 @@ trait RelationshipsTrait
     /**
      * Does this method's signature say it returns a Relation?
      *
-     * Reading the return type does not execute the method, which is the whole
-     * point. Handles `?HasMany` and union returns; a method with no declared
+     * Reading the return type does not execute the method, which is the goal. Handles `?HasMany` and union returns; a method with no declared
      * return type is not a relation as far as this is concerned.
      *
      * @param ReflectionMethod $method

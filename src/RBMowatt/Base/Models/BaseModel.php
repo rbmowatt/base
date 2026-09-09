@@ -94,11 +94,6 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
   /**
   * Soft delete through Eloquent rather than by hand.
   *
-  * This used to set deleted_at and save(). On a model without the SoftDeletes
-  * trait that wrote the column and changed nothing else, so the row kept coming
-  * back from every query, and on a table with no deleted_at column it died with
-  * "no such column: deleted_at". Neither told the caller anything was wrong.
-  *
   * @return bool|null
   * @throws SoftDeletesNotEnabledException when the model has no SoftDeletes trait
   */
