@@ -1,5 +1,9 @@
 # RBMowatt Base
 
+[![tests](https://github.com/rbmowatt/base/actions/workflows/tests.yml/badge.svg)](https://github.com/rbmowatt/base/actions/workflows/tests.yml)
+
+Requires PHP 8.3 or 8.4 and Laravel 13.
+
 ## Contents
 -  [What It Does](#what-it-does)
 
