@@ -50,7 +50,9 @@ class ApiResponse
             'responseId' => bin2hex(random_bytes(16)),
             'error' => NULL,
             'errorCode'=>NULL,
-            'version'=> function_exists('getVersion') ? getVersion() : 'undefined'
+            // app.version is not a Laravel default. The getVersion() branch is only
+            // for apps still declaring the helper this package used to autoload.
+            'version'=> Config::get('app.version') ?? (function_exists('getVersion') ? getVersion() : 'undefined')
         );
         if ($content !== '' && $content !== null) {
             $this->_contents['data'] = $content;
@@ -223,9 +225,9 @@ class ApiResponse
         // No JSON_NUMERIC_CHECK: it coerced every numeric-looking string in the
         // payload, so "07005" shipped as 7005, "1.10" as 1.1, and ids past
         // 2^53 landed outside what a JS client can parse back without loss.
-        $jr = new JsonResponse($this->_contents, $this->getStatusCode(), $this->headers);
-        return $jr->withHeaders(['Access-Control-Allow-Origin'=>'*',
-        'Access-Control-Allow-Methods'=>'GET, POST, PUT, DELETE, OPTIONS']);
+        // CORS is the host app's HandleCors middleware to set. Sending
+        // Access-Control-Allow-Origin from here overrode whatever it configured.
+        return new JsonResponse($this->_contents, $this->getStatusCode(), $this->headers);
     }
     /**
     * Turn the response to an array instead of json

@@ -4,6 +4,7 @@ use RBMowatt\Base\Models\Exceptions\InvalidDateFormatException;
 
 trait DateCalculationTrait
 {
+  const STANDARD_DATE_FORMAT = 'Y-m-d H:i:s';
 
   /**
   * [calculateSinceData description]
@@ -15,13 +16,13 @@ trait DateCalculationTrait
     //is it a unix timestamp?
     if( 1 == preg_match( '~^[1-9][0-9]*$~', $date ) )
     {
-      return date(STANDARD_DATE_FORMAT,$date);
+      return date(self::STANDARD_DATE_FORMAT,$date);
     }
     //is it some part of a DateTime?
     if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/',$date)||preg_match('/(\d{4})-(\d{2})-(\d{2})/',$date))
     {
       $date = strtotime($date);
-      return date(STANDARD_DATE_FORMAT, $date);
+      return date(self::STANDARD_DATE_FORMAT, $date);
     }
     //is it a strtotime?
     if(stristr($date,'_'))

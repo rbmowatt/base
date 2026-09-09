@@ -34,10 +34,7 @@
     "autoload": {
         "psr-4": {
             "RBMowatt\\Base\\": "src/RBMowatt/Base/"
-        },
-        "files": [
-            "src/RBMowatt/Base/functions.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {

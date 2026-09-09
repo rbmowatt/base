@@ -182,7 +182,7 @@ class BaseModelTest extends TestCase
     public function testTimestampsAndDateStringsAreNormalized(): void
     {
         $this->assertSame(
-            date(STANDARD_DATE_FORMAT, 1700000000),
+            date(Widget::STANDARD_DATE_FORMAT, 1700000000),
             $this->calculateSince('1700000000')
         );
         $this->assertSame('2026-01-02 00:00:00', $this->calculateSince('2026-01-02'));

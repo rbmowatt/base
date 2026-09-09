@@ -12,19 +12,13 @@ class PackageBootTest extends TestCase
         $this->assertNotNull($this->app->getProvider(BaseServiceProvider::class));
     }
 
-    public function testHelperFunctionsAreAutoloaded(): void
+    public function testNoHelpersLeakIntoTheGlobalNamespace(): void
     {
-        $this->assertTrue(function_exists('evalTruth'));
-        $this->assertTrue(function_exists('getVersion'));
-        $this->assertTrue(defined('STANDARD_DATE_FORMAT'));
-    }
+        foreach (['vdd', 'ldd', 'qLog', 'evalTruth', 'getVersion', 'getRootPath'] as $helper) {
+            $this->assertFalse(function_exists($helper), $helper . '() must not be declared by this package');
+        }
 
-    public function testEvalTruthOnlyAcceptsOneAndTrue(): void
-    {
-        $this->assertTrue(evalTruth('1'));
-        $this->assertTrue(evalTruth('true'));
-        $this->assertFalse(evalTruth('yes'));
-        $this->assertFalse(evalTruth('TRUE'));
+        $this->assertFalse(defined('STANDARD_DATE_FORMAT'));
     }
 
     public function testApiResponseRendersAnEnvelope(): void
