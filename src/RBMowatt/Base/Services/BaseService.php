@@ -110,6 +110,26 @@ abstract class BaseService implements ServiceInterface
     * @param mixed $callback provide a function to be caled AFTER entity saves
     * @return BaseModel
     */
+    /**
+     * Count the rows matching a set of where clauses.
+     *
+     * Takes the same $wheres QueryParser::getWheres() produces, and runs COUNT
+     * rather than fetching a page, so it stays cheap on large tables. Relations,
+     * sorts and selects are all pointless here and are not accepted.
+     *
+     * @param array $wheres
+     * @return int
+     */
+    public function getCountWhere($wheres = [])
+    {
+        return $this->setWheres($this->primaryModel->newQuery(), $wheres)->count();
+    }
+    /**
+    * Create an instance based on provided params
+    * @param array $params an array of key values to be applied to the entity
+    * @param mixed $callback provide a function to be caled AFTER entity saves
+    * @return BaseModel
+    */
     public function create($params, $callback = '')
     {
         if (!is_array($params) || (array_intersect(array_keys($params), $this->getColumns()) != array_keys($params))) {

@@ -97,6 +97,30 @@ class BaseServiceTest extends TestCase
         $this->service()->where([], ['not_a_relation']);
     }
 
+    public function testCountsMatchingRowsWithoutFetchingThem(): void
+    {
+        $service = $this->service();
+
+        $this->assertSame(2, $service->getCountWhere([]));
+        $this->assertSame(1, $service->getCountWhere([['type_id', '=', 2]]));
+        $this->assertSame(0, $service->getCountWhere([['type_id', '=', 99]]));
+    }
+
+    public function testCountIssuesOneAggregateQuery(): void
+    {
+        $queries = [];
+        \Illuminate\Support\Facades\DB::listen(function ($query) use (&$queries) {
+            $queries[] = $query->sql;
+        });
+
+        $this->service()->getCountWhere([['type_id', '=', 1]]);
+
+        $aggregates = array_values(array_filter($queries, fn ($sql) => str_contains($sql, 'count(*)')));
+
+        $this->assertCount(1, $aggregates);
+        $this->assertStringNotContainsString('limit', $aggregates[0]);
+    }
+
     public function testWhereStillWorksWithNoRelations(): void
     {
         $results = $this->service()->where([['type_id', '=', 2]]);
