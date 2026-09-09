@@ -7,9 +7,15 @@ trait DateCalculationTrait
   const STANDARD_DATE_FORMAT = 'Y-m-d H:i:s';
 
   /**
-  * [calculateSinceData description]
-  * @param  [type] $date [description]
-  * @return [type]       [description]
+  * Normalize a date query value into a `Y-m-d H:i:s` string.
+  *
+  * Accepts a unix timestamp, a `Y-m-d` or `Y-m-d H:i:s` string, or a relative
+  * `3_days` (hour, day, week, month or year, singular or plural). Relative and
+  * date-only values floor to midnight; only a full datetime keeps its time part.
+  *
+  * @param  string|int $date
+  * @return string
+  * @throws InvalidDateFormatException
   */
   protected function calculateSinceData($date)
   {
