@@ -1,17 +1,25 @@
 <?php
+
 namespace Example;
 
 use Illuminate\Support\ServiceProvider;
+use Example\Models\ExampleModel;
+use Example\Models\Interfaces\ExampleModelInterface;
 
 class ExampleServiceProvider extends ServiceProvider
 {
-
     /**
-    * Indicates if loading of the provider is deferred.
+    * Register bindings.
     *
-    * @var bool
+    * ExampleService type-hints the interface, so the container needs to know which
+    * model satisfies it. Swap the concrete class here and nothing else changes.
+    *
+    * @return void
     */
-    protected $defer = false;
+    public function register()
+    {
+        $this->app->bind(ExampleModelInterface::class, ExampleModel::class);
+    }
 
     /**
     * Bootstrap the application events.
@@ -20,17 +28,6 @@ class ExampleServiceProvider extends ServiceProvider
     */
     public function boot()
     {
-        include 'Routes.php';
+        $this->loadRoutesFrom(__DIR__ . '/Routes.php');
     }
-
-    /**
-    * Get the services provided by the provider.
-    *
-    * @return array
-    */
-    public function provides()
-    {
-        return array();
-    }
-
 }

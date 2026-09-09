@@ -3,7 +3,12 @@
     "description": "A set of base components for scaffolding a Laravel REST API: Service, Model, Controller and query-parsing primitives.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["laravel", "api", "rest", "scaffolding"],
+    "keywords": [
+        "laravel",
+        "api",
+        "rest",
+        "scaffolding"
+    ],
     "authors": [
         {
             "name": "Richard Mowatt",
@@ -36,7 +41,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "RBMowatt\\BaseTests\\": "tests/"
+            "RBMowatt\\BaseTests\\": "tests/",
+            "Example\\": "example/"
         }
     },
     "scripts": {
@@ -51,7 +57,9 @@
     },
     "config": {
         "sort-packages": true,
-        "github-protocols": ["https"]
+        "github-protocols": [
+            "https"
+        ]
     },
     "minimum-stability": "stable",
     "prefer-stable": true
