@@ -19,8 +19,14 @@ class BaseFormRequest extends FormRequest
         $this->queryParser = App::make(QueryParser::class);
     }
 
+    /**
+    * Laravel calls this when authorize() returns false, and expects it to throw.
+    * This used to be an empty body, so a failing authorize() was swallowed and the
+    * request carried on into validation and the controller action.
+    */
     protected function failedAuthorization(): void
     {
+        $this->throwPermissionsException('This action is unauthorized.');
     }
 
     protected function failedValidation(Validator $validator): void
