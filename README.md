@@ -63,7 +63,8 @@ class Widget extends BaseModel
 {
     protected $table = 'widgets';
 
-    // Eloquent still guards mass assignment, so a Service create() needs this
+    // A Service create()/update() writes only these. Anything else in the payload
+    // is a MassAssignmentException, not a silently dropped key.
     protected $fillable = ['name', 'type_id'];
 }
 ```
@@ -223,7 +224,7 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	*  [https://laravel.com/docs/13.x/eloquent](https://laravel.com/docs/13.x/eloquent)
 
-* Set `$fillable` (or `$guarded`) like any Eloquent model, a Service `create()` goes through mass assignment
+* Set `$fillable` (or `$guarded`) like any Eloquent model. A Service `create()` and `update()` check every payload key against it and throw `MassAssignmentException` on the first key the model does not accept — they do not drop it quietly the way `fill()` does. A model that declares neither is totally guarded, which is Eloquent's own default, and will reject everything until you list what is writable
 
 * `softDelete()` delegates to Eloquent, so the model needs `use SoftDeletes;` and a `deleted_at` column. Without the trait it throws rather than writing a column nothing scopes on
 

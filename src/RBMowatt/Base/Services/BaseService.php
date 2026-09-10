@@ -2,6 +2,7 @@
 
 namespace RBMowatt\Base\Services;
 
+use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Support\Facades\App;
 use RBMowatt\Base\ErrorCodes;
 use RBMowatt\Base\Exceptions\EntityDoesNotExistException;
@@ -161,9 +162,8 @@ abstract class BaseService implements ServiceInterface
             throw new InvalidArgumentsException('Invalid Arguments');
         }
         $model = App::make(get_class($this->primaryModel));
-        foreach ($params as $prop => $value) {
-            $model->{$prop} = $value;
-        }
+        $this->guardMassAssignment($model, $params);
+        $model->fill($params);
         $model->save();
         if (!empty($callback)) {
              //apply any additional logic provided after we save
@@ -188,15 +188,47 @@ abstract class BaseService implements ServiceInterface
             //there shouldn't be any parameters in the request that don't match up with the record
             throw new InvalidArgumentsException('Invalid Arguments');
         }
-        foreach ($args as $key => $value) {
-            $entity->{$key} = $value;
-        }
+        $this->guardMassAssignment($entity, $args);
+        $entity->fill($args);
         if (!empty($callback)) {
             //apply any additional logic provided before we save
             $callback($entity);
         }
         $entity->save();  
         return $entity;
+    }
+    /**
+     * Reject any key the model's own $fillable/$guarded would not accept.
+     *
+     * create() and update() used to assign with $model->{$key} = $value, which is
+     * setAttribute() and carries no mass-assignment check at all, so $fillable was
+     * decorative: any real column was writable straight off the request, is_admin
+     * and password included. fill() alone is not enough either, because Eloquent
+     * only throws on a totally-guarded model and otherwise drops the offending key
+     * in silence, which hands the caller a saved model that quietly ignored half
+     * the payload.
+     *
+     * @param BaseModel $model
+     * @param array<string, mixed> $params
+     * @return void
+     * @throws MassAssignmentException
+     */
+    protected function guardMassAssignment($model, array $params)
+    {
+        $blocked = array_values(array_filter(
+            array_keys($params),
+            function ($key) use ($model) {
+                return !$model->isFillable($key);
+            }
+        ));
+
+        if ($blocked) {
+            throw new MassAssignmentException(sprintf(
+                'Add [%s] to fillable property to allow mass assignment on [%s].',
+                implode(', ', $blocked),
+                get_class($model)
+            ));
+        }
     }
     /**
      * Delete A Single Instance
