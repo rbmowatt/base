@@ -31,6 +31,8 @@ Requires PHP 8.3 or 8.4 and Laravel 11, 12 or 13.
 
 -  [Static Analysis](#static-analysis)
 
+-  [History](#history)
+
 
 ## Install
 
@@ -552,3 +554,11 @@ PHPStan runs at level 5 over `src`, with larastan supplying Laravel's own types 
 
 The composer script passes `--memory-limit=1G`. Larastan resolves the whole framework to read Eloquent's types and needs well past PHP's stock 128M, so `vendor/bin/phpstan analyse` on a default CLI config dies with "PHPStan process crashed because it reached configured PHP memory limit" from a parallel worker. CI never saw it because `setup-php` leaves `memory_limit` at `-1`.
 
+
+## History
+
+First committed June 2020. Modernized in 2026 for Laravel 11, 12 and 13 on PHP 8.3+.
+
+```
+git log --reverse
+```
