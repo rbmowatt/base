@@ -104,8 +104,8 @@ class RelationTraversalTest extends TestCase
 
     public function testAnUnknownSegmentBelowAValidRootIsRejected(): void
     {
-        // this is the hole: `keys` resolves, so the old check passed the whole path
-        // through to Eloquent and never looked at what came after it
+        // `keys` resolves, so a root-only check would pass the whole path through to
+        // Eloquent without ever looking at what comes after it
         $this->expectException(InvalidRelationException::class);
 
         (new VaultService())->where([], ['keys.not_a_relation']);

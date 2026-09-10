@@ -14,14 +14,14 @@ class BaseFormRequest extends FormRequest
     protected $queryParser;
 
     /**
-    * Symfony's Request::create() builds the instance as
-    * new static($query, $request, $attributes, $cookies, $files, $server, $content).
-    * This used to declare no parameters and call parent::__construct() with none,
-    * so all seven were accepted and thrown away: ExampleRequest::create('/x','POST',
-    * ['name' => 'delta']) produced a request whose all() was empty, and every rule
-    * came back "field is required". Laravel's own resolution path hides it, because
-    * FormRequestServiceProvider constructs with no arguments and then copies the
-    * real request in with createFrom().
+    * The full signature has to be carried through. Symfony's Request::create() builds
+    * the instance as
+    * new static($query, $request, $attributes, $cookies, $files, $server, $content),
+    * so a no-argument constructor accepts all seven and throws them away, leaving a
+    * request whose all() is empty and every rule reporting "field is required".
+    * Laravel's own resolution path masks that, because FormRequestServiceProvider
+    * constructs with no arguments and then copies the real request in via
+    * createFrom().
     *
     * @param array<string, mixed> $query
     * @param array<string, mixed> $request
@@ -45,9 +45,9 @@ class BaseFormRequest extends FormRequest
     }
 
     /**
-    * Laravel calls this when authorize() returns false, and expects it to throw.
-    * This used to be an empty body, so a failing authorize() was swallowed and the
-    * request carried on into validation and the controller action.
+    * Laravel calls this when authorize() returns false and expects it to throw. An
+    * empty body here swallows the rejection and lets the request carry on into
+    * validation and the controller action.
     */
     protected function failedAuthorization(): void
     {

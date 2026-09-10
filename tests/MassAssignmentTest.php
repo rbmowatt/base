@@ -57,8 +57,8 @@ class MassAssignmentTest extends TestCase
 
     public function testCreateRejectsAColumnThatIsNotFillable(): void
     {
-        // is_admin is a real column, which is all create() used to check before
-        // assigning it straight off the request.
+        // is_admin is a real column, so a column-existence check alone would let it
+        // through straight off the request
         $this->expectException(MassAssignmentException::class);
         $this->expectExceptionMessage('is_admin');
 

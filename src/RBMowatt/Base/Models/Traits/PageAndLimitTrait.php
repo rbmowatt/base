@@ -8,16 +8,16 @@ trait PageAndLimitTrait
     /**
     * Resolve $group to a column on this model, quoted for the grammar.
     *
-    * All three scopes below build their MySQL user-variable trick with DB::raw,
-    * and $group was interpolated into it as-is. That is reachable from a request:
+    * All three scopes below build their MySQL user-variable trick with DB::raw, and
+    * $group lands inside that string. It is reachable from a request:
     * BaseService::setWheres() calls a mapped scope as $model->{$scope}($value, $op),
-    * so a service with `$scopes = ['group' => 'limitTo']` put the caller's string
-    * straight into the statement — verified producing
+    * so a service declaring `$scopes = ['group' => 'limitTo']` hands the caller's
+    * string to it, and interpolating that directly yields
     * `@group = 1) UNION SELECT password_hash,1,1 FROM accts -- ` inside the SELECT.
     *
     * A binding cannot stand in for a column reference here, so the value is checked
-    * against the real column list and then quoted, which is the same thing the
-    * query grammar would do for a column it was given properly.
+    * against the real column list and then quoted — the same thing the query grammar
+    * does for a column it is given properly.
     *
     * @param  \Illuminate\Database\Eloquent\Builder<static> $query
     * @param  mixed $group

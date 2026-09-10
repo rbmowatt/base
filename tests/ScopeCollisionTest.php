@@ -89,7 +89,7 @@ class ScopeCollisionTest extends TestCase
 
     public function testAKeyThatIsBothAColumnAndAScopeIsRejected(): void
     {
-        // silently preferring the scope is what this replaces
+        // silently preferring either reading hides the ambiguity from the caller
         $this->expectException(AmbiguousQueryParamException::class);
 
         (new CollidingService())->where([['queue_id', '=', 1]]);

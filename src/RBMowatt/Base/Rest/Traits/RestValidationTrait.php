@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\Validator;
 trait RestValidationTrait
 {
     /**
-    * Key that marks the required block of a rule set. This lived on
-    * BaseApiController, so using the trait anywhere else raised an undefined
-    * constant. Classes that use the trait still expose it as their own constant.
+    * Key that marks the required block of a rule set. It belongs on the trait, not
+    * on BaseApiController: parseValidation() reads it, so any class using the trait
+    * outside that hierarchy would hit an undefined constant. Classes using the trait
+    * still expose it as their own constant.
     */
     const REQUIRED = 'required';
 

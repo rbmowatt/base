@@ -143,10 +143,10 @@ class BaseServiceTest extends TestCase
     }
 
     /**
-     * select() used to read getTable() off whatever eagerLoad() returned. With any
-     * relation requested that is a Builder, which forwards unknown calls to the
-     * query builder, so asking for relations and selects together was a
-     * BadMethodCallException.
+     * select() has to read getTable() off the service's own model, not off whatever
+     * eagerLoad() returns. With any relation requested that is a Builder, which
+     * forwards unknown calls to the query builder, so relations and selects together
+     * would otherwise be a BadMethodCallException.
      */
     public function testFindTakesRelationsAndSelectsTogether(): void
     {

@@ -68,14 +68,15 @@ class ApiResponse implements ApiResponseInterface
             'uid'=>  NULL,
             'time' => date('c'),
             'statusCode' => $status,
-            // 32 hex chars, same shape md5(time()) produced, so log greps keep working.
-            // md5(time()) handed every response in the same second an identical id,
-            // which made responseId useless for correlating a request with its logs.
+            // 32 hex chars, and random rather than time-derived: two responses in the
+            // same second have to be distinguishable or this cannot correlate a
+            // request with its log line, which is the only job it has.
             'responseId' => bin2hex(random_bytes(16)),
             'error' => NULL,
             'errorCode'=>NULL,
-            // app.version is not a Laravel default. The getVersion() branch is only
-            // for apps still declaring the helper this package used to autoload.
+            // app.version is not a Laravel default, so an app that wants a real value
+            // has to set it. The getVersion() branch picks up a host app that declares
+            // that helper globally instead.
             'version'=> Config::get('app.version') ?? (function_exists('getVersion') ? getVersion() : 'undefined')
         );
         if ($content !== '' && $content !== null) {
@@ -203,15 +204,15 @@ class ApiResponse implements ApiResponseInterface
     * Render an exception for the `error` field.
     *
     * Reads app.debug rather than env('APP_ENV'): once the host app runs
-    * config:cache, env() outside of config files returns null, so an
-    * env-based check silently picks the wrong branch in production.
+    * config:cache, env() outside of config files returns null, so an env-based
+    * check picks the wrong branch in production.
     *
     * With debug off only this package's own exceptions are echoed back, because
     * those messages are written for the caller. Everything else is replaced. A
     * QueryException is the reason: its getMessage() carries the whole statement
-    * with the bindings already interpolated, so `?select=no_such_column` returned
-    * the table's real SQL to the client and turned a 500 into remote schema
-    * enumeration, and a failed INSERT returned the row being written.
+    * with the bindings already interpolated, so an unredacted body turns
+    * `?select=no_such_column` into remote schema enumeration and hands back the
+    * row being written when an INSERT fails.
     *
     * The envelope's responseId is what ties the redacted body to the logged
     * exception.

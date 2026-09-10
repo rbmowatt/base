@@ -36,9 +36,10 @@ class BaseApiController extends Controller
     }
 
     /**
-    * This used to call Auth::guard('api') directly. Laravel 11 dropped the api
-    * guard from the stock config/auth.php, so on a fresh app every subclass threw
-    * "Auth guard [api] is not defined" from its constructor, before any action ran.
+    * Resolves against auth.defaults.guard rather than naming a guard here. Laravel
+    * 11 dropped `api` from the stock config/auth.php, so hardcoding it throws
+    * "Auth guard [api] is not defined" on a fresh app, from the constructor of every
+    * subclass, before any action runs.
     *
     * @return mixed the authenticated user, or null when the app has no auth bound
     */

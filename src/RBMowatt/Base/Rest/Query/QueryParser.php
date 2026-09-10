@@ -80,8 +80,8 @@ class QueryParser
       if(!in_array($direction = trim(array_pop($p)), $this->validSortOrders))
       {
         // A SortException rather than a bare \Exception: ApiResponse only echoes
-        // this package's own exception messages back with debug off, so a plain
-        // one turned a client's bad sort key into an opaque 'Server Error'.
+        // this package's own exception messages back with debug off, so a plain one
+        // reaches the caller as an opaque 'Server Error' for a key they mistyped.
         throw new SortException('Invalid Sort Order ' . $direction);
       }
       $sorts[] = [implode(self::SORT_DELIMITER, $p), $direction];
@@ -117,9 +117,9 @@ class QueryParser
   /**
   * get the limit on records to be returned
   *
-  * Clamped to $maxLimit and returned as an int. This used to hand the raw request
-  * value to paginate(): ?limit=1000000 was a one-request table dump and a memory
-  * spike, and ?limit=abc reached the paginator as the string 'abc'.
+  * Clamped to $maxLimit and returned as an int. An unclamped value goes straight
+  * into paginate(), where ?limit=1000000 is a one-request table dump and a memory
+  * spike, and ?limit=abc arrives as the string 'abc'.
   *
   * @return int
   */
@@ -139,7 +139,7 @@ class QueryParser
   * Coerce a request value to an int inside [$min, $max].
   *
   * Anything non-numeric falls back to $default rather than to PHP's (int) cast,
-  * which turns 'abc' into 0 and would silently page by nothing.
+  * which turns 'abc' into 0 and pages by nothing.
   *
   * @param  mixed $value
   * @param  int $default

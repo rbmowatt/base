@@ -31,19 +31,18 @@ abstract class BaseService implements ServiceInterface
     */
     protected $scopes = [];
     /*
-    Same idea as $scopes but for sorts. Declared here because getSortScope() reads it
-    on any sort that isn't a real column, and a Service that didn't define it got
-    "Undefined property" instead of the SortException it should have raised.
+    Same idea as $scopes but for sorts. getSortScope() reads it on any sort that is
+    not a real column, so it has to exist even on a Service that declares none.
     */
     protected $sortScopes = [];
     /*
     Columns this service will accept as `?column=value` filters. Empty means none.
 
-    This used to be "any column on the table", which made every column a query
-    oracle: the parser turns `?password_hash=>$2y$10$K` into a real where clause,
-    `?count=true` answers it in one cheap integer, and $hidden does nothing because
-    it only governs serialization. A hash or a reset token falls to a character-at-
-    a-time binary search from that. List what callers are allowed to filter on.
+    Anything listed here is a query oracle for whoever can call the endpoint: the
+    parser turns `?password_hash=>$2y$10$K` into a real where clause, `?count=true`
+    answers it in one cheap integer, and $hidden does not help because it governs
+    serialization, not the query. A hash or a reset token falls to a character-at-a-
+    time binary search from that. List only what callers are meant to filter on.
     */
     protected $filterable = [];
     /*
@@ -197,9 +196,9 @@ abstract class BaseService implements ServiceInterface
     /**
      * The path pagination links are built from, or null when there is no request.
      *
-     * Reads the container's request rather than $_SERVER: outside a web request
-     * $_SERVER has no REQUEST_URI at all, and preg_replace() on that null both
-     * raised a deprecation and handed the paginator a null path.
+     * Reads the container's request, not $_SERVER: outside a web request $_SERVER
+     * carries no REQUEST_URI, and a null path reaches the paginator as broken
+     * next/prev links rather than as an error.
      *
      * @return string|null
      */
@@ -277,13 +276,12 @@ abstract class BaseService implements ServiceInterface
     /**
      * Reject any key the model's own $fillable/$guarded would not accept.
      *
-     * create() and update() used to assign with $model->{$key} = $value, which is
-     * setAttribute() and carries no mass-assignment check at all, so $fillable was
-     * decorative: any real column was writable straight off the request, is_admin
-     * and password included. fill() alone is not enough either, because Eloquent
-     * only throws on a totally-guarded model and otherwise drops the offending key
-     * in silence, which hands the caller a saved model that quietly ignored half
-     * the payload.
+     * fill() on its own is not enough: Eloquent throws only on a totally-guarded
+     * model and otherwise drops the offending key in silence, handing the caller a
+     * saved model that ignored half the payload. Assigning with
+     * $model->{$key} = $value is worse — that is setAttribute(), which carries no
+     * mass-assignment check at all, so a request could write is_admin or a password
+     * column just by naming it.
      *
      * @param BaseModel $model
      * @param array<string, mixed> $params
@@ -463,9 +461,7 @@ abstract class BaseService implements ServiceInterface
         $table = $this->primaryModel->getTable();
         $selects = [];
         foreach ($columns as $property) {
-            // an already-qualified column passes through; $c here was an undefined
-            // variable, so a dotted select produced null and three null-argument
-            // deprecations on the way down into the query builder
+            // an already-qualified column passes through untouched
             $selects[] = (stristr($property, '.')) ? $property : implode('.', [$table, $property]);
         }
         if (count($selects)) {
@@ -497,12 +493,12 @@ abstract class BaseService implements ServiceInterface
      * Validate the relations on the model that are being asked for
      *
      * Every segment of a dotted path is resolved against the model at that level.
-     * This used to check only the root and hand the rest of the path straight to
-     * Eloquent's with(), so one authorized root relation walked the whole object
-     * graph behind it: ?with=tokens.account.tokens returned the related account
-     * and its tokens to a caller authorized for nothing but the primary resource.
-     * Each hop is also another query plus a withCount, so an unbounded path is a
-     * cheap way to multiply work per request — hence $maxRelationDepth.
+     * Checking only the root and handing the rest to Eloquent's with() would let one
+     * authorized relation walk the whole object graph behind it:
+     * ?with=tokens.account.tokens returns the related account and its tokens to a
+     * caller authorized for nothing but the primary resource. Each hop is also
+     * another query plus a withCount, so an unbounded path multiplies work per
+     * request — hence $maxRelationDepth.
      *
      * @param  BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel> $model
      * @param  array $withs
@@ -554,8 +550,8 @@ abstract class BaseService implements ServiceInterface
                 // is no relationships() on it to check the next hop against
                 return false;
             }
-            // read the related class out of the map already in hand rather than
-            // calling getRelationshipModel(), which asks for the whole map again
+            // read the related class out of the map already in hand;
+            // getRelationshipModel() would ask for the whole map a second time
             $relations = $current->relationships();
             if (!array_key_exists($segment, $relations)) {
                 return false;
@@ -578,7 +574,7 @@ abstract class BaseService implements ServiceInterface
     protected function isScope($key)
     {
         // A column has to be listed AND real. Requiring both means a typo in
-        // $filterable is an InvalidQueryParamException rather than a QueryException
+        // $filterable raises InvalidQueryParamException rather than a QueryException
         // carrying the statement back to the caller.
         $isColumn = in_array($key, $this->getColumns());
         $isAllowlisted = in_array($key, $this->getFilterable(), true);

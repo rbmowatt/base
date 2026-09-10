@@ -3,11 +3,11 @@
 use RBMowatt\Base\Exception;
 
 /**
-* The service and model arguments are kept in the signature and on the exception
-* so a handler or log formatter can still reach them, but they are no longer
-* rendered into the message: ApiResponse echoes this package's own messages back
-* to the client with debug off, and ":service=>[App\Services\PatientService]"
-* handed the internal namespace to anyone who sent an unknown query parameter.
+* The service and model are kept on the exception so a handler or log formatter can
+* reach them, but deliberately stay out of the message: ApiResponse echoes this
+* package's own messages back to the client with debug off, and
+* ":service=>[App\Services\PatientService]" would hand the internal namespace to
+* anyone who sends an unknown query parameter.
 */
 class InvalidQueryParamException extends Exception
 {

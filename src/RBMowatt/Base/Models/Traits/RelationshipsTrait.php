@@ -20,11 +20,10 @@ trait RelationshipsTrait
     /**
      * Get the model relations list so we can validate when asked
      *
-     * Cached, because discovery is not cheap and ?with= validation walks it once
-     * per segment: reflecting the class is the small half, and building a relation
-     * object for every relation method on it to read the related class is the big
-     * half. Measured at 0.36ms per ?with=a.b validation uncached against 0.03ms for
-     * the root-only check this replaced.
+     * Cached, because discovery is not cheap and ?with= validation walks it once per
+     * segment: reflecting the class is the small half, and building a relation object
+     * for every relation method on it to read the related class is the big half.
+     * Uncached that measures 0.36ms per ?with=a.b validation against 0.03ms cached.
      *
      * The map is class names, foreign keys and short type names, so it survives a
      * cache round trip intact. Add or rename a relation and the map is stale until
