@@ -41,13 +41,15 @@ class ExampleService extends BaseService
      * the sort will be added as a scope rather than applied
      * right on to the query
      *
-     * the key is matched exactly, unlike $scopes: there is no underscore-to-dot
-     * step here, so a dotted key can never be reached from a query string
+     * can accept either '_' or '.' delimiter, the same as $scopes
      * add the 'scope' keyword to the method but not the mapping!!!
      */
     protected $sortScopes = [
-        'account_type' => 'sortByAccountType',
-        //turns into $example->sortByAccountType('account_type', 'ASC')
+        'widget.type.name' => 'sortByWidgetTypeName',
+        //reached as ?sort=widget_type_name_ASC, and turns into
+        //$example->sortByWidgetTypeName('widget_type_name', 'ASC')
+        //account_type would be the wrong key here: it is a real column, so naming a
+        //sort scope after it makes the key mean two things and the request is refused
     ];
 
     /**

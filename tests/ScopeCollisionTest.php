@@ -22,6 +22,16 @@ class Ticket extends BaseModel
     {
         return $query->where('owner', $operator, $value);
     }
+
+    public function scopeSortByOwner($query, $key, $direction)
+    {
+        return $query->orderBy('owner', $direction);
+    }
+
+    public function scopeSortByQueueId($query, $key, $direction)
+    {
+        return $query->orderBy('queue_id', $direction);
+    }
 }
 
 class CollidingService extends BaseService
@@ -41,6 +51,40 @@ class ResolvedService extends BaseService
     protected $filterable = ['queue_id'];
 
     protected $scopes = ['queue.id' => 'byQueueId'];
+
+    public function __construct()
+    {
+        $this->primaryModel = new Ticket();
+    }
+}
+
+class CollidingSortService extends BaseService
+{
+    // owner is a real column and the sort scope is named after it
+    protected $sortScopes = ['owner' => 'sortByOwner'];
+
+    public function __construct()
+    {
+        $this->primaryModel = new Ticket();
+    }
+}
+
+class DottedCollidingSortService extends BaseService
+{
+    // queue.id maps to queue_id, which is also a column
+    protected $sortScopes = ['queue.id' => 'sortByQueueId'];
+
+    public function __construct()
+    {
+        $this->primaryModel = new Ticket();
+    }
+}
+
+class ResolvedSortService extends BaseService
+{
+    protected $sortable = ['queue_id'];
+
+    protected $sortScopes = ['queue.id' => 'sortByQueueId'];
 
     public function __construct()
     {
@@ -139,5 +183,54 @@ class ScopeCollisionTest extends TestCase
     {
         // ?where=[queue.id=1] never looks like a column, so it is not ambiguous
         $this->assertSame(1, (new CollidingService())->where([['queue.id', '=', 1]])->count());
+    }
+
+    public function testASortKeyThatIsBothAColumnAndAScopeIsRejected(): void
+    {
+        $this->expectException(AmbiguousQueryParamException::class);
+
+        (new CollidingSortService())->where([], [], [['owner', 'ASC']]);
+    }
+
+    public function testADottedSortScopeCollidingWithAColumnIsRejected(): void
+    {
+        $this->expectException(AmbiguousQueryParamException::class);
+
+        (new DottedCollidingSortService())->where([], [], [['queue_id', 'ASC']]);
+    }
+
+    public function testTheSortMessagePointsAtSortableNotFilterable(): void
+    {
+        try {
+            (new CollidingSortService())->where([], [], [['owner', 'ASC']]);
+            $this->fail('expected AmbiguousQueryParamException');
+        } catch (AmbiguousQueryParamException $e) {
+            $this->assertSame('sortable', $e->getAllowlist());
+            $this->assertStringContainsString('$sortable', $e->getMessage());
+            $this->assertStringNotContainsString('$filterable', $e->getMessage());
+        }
+    }
+
+    public function testListingTheColumnInSortableSettlesIt(): void
+    {
+        $results = (new ResolvedSortService())->where([], [], [['queue_id', 'DESC']]);
+
+        $this->assertSame(2, $results->items()->first()->queue_id);
+    }
+
+    public function testASortScopeWithNoMatchingColumnIsUnaffected(): void
+    {
+        $service = new class extends BaseService {
+            protected $sortScopes = ['queue.rank' => 'sortByQueueId'];
+
+            public function __construct()
+            {
+                $this->primaryModel = new Ticket();
+            }
+        };
+
+        $results = $service->where([], [], [['queue_rank', 'DESC']]);
+
+        $this->assertSame(2, $results->items()->first()->queue_id);
     }
 }

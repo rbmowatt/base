@@ -355,9 +355,11 @@ abstract class BaseService implements ServiceInterface
             //will throw exception if sort not valid
             $this->checkValidSort($sort);
 
-            if (!$this->isSortableColumn($sort[0]) && $scope = $this->getSortScope($sort[0])) {
+            if (!$this->isSortableColumn($sort[0])) {
                 //in this case the sort isn't based on a model property
                 //instead it needs to be passed to a scope dedicated to sort
+                $this->guardSortAmbiguity($sort[0]);
+                $scope = $this->getSortScope($sort[0]);
                 $model = $model->{$scope}($sort[0], $sort[1]);
                 continue;
             }
@@ -421,17 +423,43 @@ abstract class BaseService implements ServiceInterface
     /**
      * This method determines wheter a sort scope is valid
      * and will return the mapped method name if found
+     *
+     * Resolves the same way $scopes does, so `type.name` is reachable as
+     * `?sort=type_name_ASC`. A query string cannot carry the dotted form: the
+     * parser splits the direction off the last underscore, so the key that arrives
+     * here is always underscored.
+     *
      * @param  string $key
      * @return string
      * @throws SortException
      */
     protected function getSortScope($key)
     {
-        foreach ($this->sortScopes as $ssKey => $scopeMethod) {
-            //if keys match or sortScope is global and relation names match
-            if (trim($ssKey) == trim($key))  return $scopeMethod;
+        if ($scopeKey = $this->matchScopeKey($key, $this->sortScopes)) {
+            return $this->sortScopes[$scopeKey];
         }
         throw new SortException('Invalid Sort Scope ' . $key);
+    }
+    /**
+     * Refuse a sort key that names both a column and a sort scope.
+     *
+     * The mirror of the check isScope() makes for filters, and it exists for the
+     * same reason: once underscores map to dots, a column named `type_name` and a
+     * scope declared `type.name` both answer to `?sort=type_name_ASC`, and choosing
+     * one silently gives the caller an ordering they did not ask for.
+     *
+     * @param  string $key
+     * @return void
+     * @throws AmbiguousQueryParamException
+     */
+    protected function guardSortAmbiguity($key)
+    {
+        if (!in_array($key, $this->getColumns())) {
+            return;
+        }
+        if ($scopeKey = $this->matchScopeKey($key, $this->sortScopes)) {
+            throw new AmbiguousQueryParamException($key, $scopeKey, 'sortable');
+        }
     }
     /*
     Helper method to make sure that sort order was passed in the coorect format
@@ -598,24 +626,42 @@ abstract class BaseService implements ServiceInterface
     }
 
     /**
-     * The declared scope key this request key maps to, or null.
-     *
-     * A scope may be declared with dots (`widget.type.id`) and arrive with
-     * underscores, since a query string cannot carry the dotted form cleanly.
+     * The declared filter scope key this request key maps to, or null.
      *
      * @param  string $key
      * @return string|null
      */
     protected function matchScope($key)
     {
-        $scopes = array_keys($this->getScopes());
+        return $this->matchScopeKey($key, $this->getScopes());
+    }
 
-        if (in_array($key, $scopes)) {
-            return $key;
-        }
-        $dotted = str_replace('_', '.', $key);
-        if (in_array($dotted, $scopes)) {
-            return $dotted;
+    /**
+     * The declared key in $scopes this request key maps to, or null.
+     *
+     * A scope may be declared with dots (`widget.type.id`) and arrive with
+     * underscores, since a query string cannot carry the dotted form cleanly:
+     * `?widget.type.id=1` is a legal parameter name but PHP rewrites the dots to
+     * underscores before the request object ever sees it, and a sort key has the
+     * direction split off its last underscore before it gets here.
+     *
+     * Keys are trimmed on both sides so a stray space in a declaration does not
+     * quietly make the mapping unreachable.
+     *
+     * @param  string $key
+     * @param  array<string, string> $scopes
+     * @return string|null
+     */
+    protected function matchScopeKey($key, array $scopes)
+    {
+        $key = trim($key);
+
+        foreach ([$key, str_replace('_', '.', $key)] as $candidate) {
+            foreach ($scopes as $declared => $method) {
+                if (trim($declared) === $candidate) {
+                    return $declared;
+                }
+            }
         }
         return null;
     }

@@ -101,7 +101,8 @@ class ExampleTest extends TestCase
 
     public function testSortScopeMapping(): void
     {
-        $payload = $this->controller(['sort' => 'account_type_ASC'])->index()->getData(true);
+        // the scope is declared as widget.type.name and reached with underscores
+        $payload = $this->controller(['sort' => 'widget_type_name_ASC'])->index()->getData(true);
 
         $this->assertSame(['beta', 'alpha', 'gamma'], array_column($payload['data'], 'name'));
     }

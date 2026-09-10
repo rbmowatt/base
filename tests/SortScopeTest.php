@@ -112,14 +112,13 @@ class SortScopeTest extends TestCase
         (new CrateService())->where([], [], [['not_declared', 'ASC']]);
     }
 
-    public function testSortScopeKeysAreMatchedExactly(): void
+    public function testADottedSortScopeKeyIsReachedWithUnderscores(): void
     {
-        // ?sort=weight_class_ASC arrives as the key weight_class. Unlike $scopes,
-        // getSortScope() does no underscore-to-dot conversion, so a dotted sortScope
-        // key is unreachable from a query string.
-        $this->expectException(SortException::class);
+        // ?sort=weight_class_ASC arrives as the key weight_class and resolves to the
+        // scope declared as weight.class, the same mapping $scopes does
+        $results = (new DottedSortScopeService())->where([], [], [['weight_class', 'DESC']]);
 
-        (new DottedSortScopeService())->where([], [], [['weight_class', 'ASC']]);
+        $this->assertSame(['alpha', 'zulu'], $results->items()->pluck('label')->all());
     }
 
     public function testTheParserSplitsTheDirectionOffTheLastUnderscore(): void

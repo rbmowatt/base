@@ -30,7 +30,7 @@ class WidgSvc extends BaseService
     protected $filterable = ['name', 'type_id'];
     protected $sortable = ['name', 'type_id'];
     protected $scopes = ['widget.type.id' => 'byWidgetType'];
-    protected $sortScopes = ['type_name' => 'sortByTypeName'];
+    protected $sortScopes = ['type.name' => 'sortByTypeName'];
     public function __construct() { $this->primaryModel = new Widg(); }
 }
 
