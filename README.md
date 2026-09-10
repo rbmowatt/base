@@ -241,7 +241,7 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	*  [RelationshipsTrait](src/RBMowatt/Base/Models/Traits/RelationshipsTrait.php)
 
-	*  [PageAndLimitTrait](src/RBMowatt/Base/Models/Traits/PageAndLimitTrait.php)
+	*  [PageAndLimitTrait](src/RBMowatt/Base/Models/Traits/PageAndLimitTrait.php) — `limitTo`, `page` and `pt` build MySQL user-variable SQL through `DB::raw`. The grouping column is checked against the model's real columns and quoted before it goes in, and the group size must be a positive integer, because `setWheres()` will hand a mapped scope whatever the caller sent
 
 	*  [DateCalculationTrait](src/RBMowatt/Base/Models/Traits/DateCalculationTrait.php)
 
