@@ -22,6 +22,23 @@ use RBMowatt\Base\Rest\Exceptions\ValidationException;
 * declares setStatusCode(int $code, ?string $text = null): static, so the loose
 * single-argument override this class needs is a fatal signature conflict against
 * any Symfony 6+.
+*
+* Envelope fields are read and written through __get/__set onto $_contents, so any
+* key set here reaches the JSON payload. These are the ones the package itself sets.
+*
+* @property bool $success
+* @property string|null $href
+* @property string|null $app
+* @property mixed $uid
+* @property string $time
+* @property int $statusCode
+* @property string $responseId
+* @property mixed $error
+* @property mixed $errorCode
+* @property string $version
+* @property mixed $data
+* @property array $meta
+* @property \Illuminate\Support\MessageBag $validationErrors
 */
 class ApiResponse
 {
@@ -39,7 +56,7 @@ class ApiResponse
         $this->headers = $headers;
         $this->_contents = array(
             'success'=>false,
-            'href' => isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI']: 'N/A',
+            'href' => $this->resolveHref(),
             'app' => Config::get('app.name', '[app.name] not set '),
             'uid'=>  NULL,
             'time' => date('c'),
@@ -250,6 +267,20 @@ class ApiResponse
         // response, not just the authenticated ones. Auth::id() also avoids
         // assuming the user model exposes an `id` property.
         $this->_contents['uid'] = App::bound('auth') ? Auth::id() : null;
+    }
+
+    /**
+     * The URI of the request this response answers, or null when none is bound.
+     *
+     * The container's request is the one being handled. $_SERVER is process-global,
+     * so on any long-lived worker it holds whatever the process started with rather
+     * than the current request, and href drifted or came back 'N/A'.
+     *
+     * @return string|null
+     */
+    protected function resolveHref()
+    {
+        return App::bound('request') ? App::make('request')->getRequestUri() : null;
     }
 
     /**
