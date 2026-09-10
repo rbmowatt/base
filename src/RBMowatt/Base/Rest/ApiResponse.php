@@ -14,6 +14,7 @@ use InvalidArgumentException;
 use RBMowatt\Base\ErrorCodes;
 use RBMowatt\Base\Exception as BaseException;
 use RBMowatt\Base\Rest\Exceptions\ValidationException;
+use RBMowatt\Base\Rest\Interfaces\ApiResponseInterface;
 
 /**
 * Builds the standard API envelope and renders it as a JsonResponse.
@@ -40,7 +41,7 @@ use RBMowatt\Base\Rest\Exceptions\ValidationException;
 * @property array $meta
 * @property \Illuminate\Support\MessageBag $validationErrors
 */
-class ApiResponse
+class ApiResponse implements ApiResponseInterface
 {
     protected $_contents = array();
 

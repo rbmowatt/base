@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use RBMowatt\Base\ErrorCodes;
 use RBMowatt\Base\Exceptions\EntityDoesNotExistException;
-use RBMowatt\Base\Rest\ApiResponse;
+use RBMowatt\Base\Rest\Interfaces\ApiResponseInterface;
 use RBMowatt\Base\Rest\Traits\RestValidationTrait;
 use RBMowatt\Base\Services\ServiceResultsCollection;
 
@@ -28,7 +28,7 @@ class BaseApiController extends Controller
     */
     protected $guard = null;
 
-    public function __construct(ApiResponse $response)
+    public function __construct(ApiResponseInterface $response)
     {
         $this->response = $response;
         $this->request = App::make(Request::class);
