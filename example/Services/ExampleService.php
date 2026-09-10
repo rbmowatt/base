@@ -41,7 +41,8 @@ class ExampleService extends BaseService
      * the sort will be added as a scope rather than applied
      * right on to the query
      *
-     * can accept either '_' or '.' delimiter
+     * the key is matched exactly, unlike $scopes: there is no underscore-to-dot
+     * step here, so a dotted key can never be reached from a query string
      * add the 'scope' keyword to the method but not the mapping!!!
      */
     protected $sortScopes = [
