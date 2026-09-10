@@ -70,6 +70,22 @@ class Widget extends BaseModel
     // A Service create()/update() writes only these. Anything else in the payload
     // is a MassAssignmentException, not a silently dropped key.
     protected $fillable = ['name', 'type_id'];
+
+    // a filter scope. WidgetService maps ?widget_type_id= onto this, so the filter
+    // key never has to match a column name
+    public function scopeByWidgetType($query, $value, $operator = '=')
+    {
+        return $query->where('widgets.type_id', $operator, $value);
+    }
+
+    // a sort scope, for ordering by something that is not a column on this table
+    public function scopeSortByTypeName($query, $key, $direction)
+    {
+        return $query->orderBy(
+            DB::table('widget_types')->select('name')->whereColumn('widget_types.id', 'widgets.type_id'),
+            $direction
+        );
+    }
 }
 ```
 
@@ -83,11 +99,13 @@ class WidgetService extends BaseService
     // columns callers may sort by
     protected $sortable = ['name', 'type_id'];
 
-    // filter params that map to a scope instead of a column
+    // filter params that map to a scope instead of a column. Declared with dots,
+    // reached as ?widget_type_id=
     protected $scopes = ['widget.type.id' => 'byWidgetType'];
 
-    // sort params that map to a scope instead of a column
-    protected $sortScopes = [];
+    // sort params that map to a scope instead of a column. Declared with dots,
+    // reached as ?sort=type_name_ASC
+    protected $sortScopes = ['type.name' => 'sortByTypeName'];
 
     public function __construct(Widget $widget)
     {
@@ -132,7 +150,7 @@ class WidgetController extends BaseApiController
 }
 ```
 
-That is a working `GET /api/widget` with `?type_id=2`, `?sort=name_DESC`, `?limit=20&page=2` and the standard envelope, no further wiring.
+That is a working `GET /api/widget` with `?type_id=2`, `?widget_type_id=2`, `?sort=name_DESC`, `?sort=type_name_ASC`, `?limit=20&page=2` and the standard envelope, no further wiring.
 
 ## Architecture
 
@@ -154,7 +172,7 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 		*  `protected $sortScopes`
 
-		*  declare it on every Service even when empty, a sort that isn't a column looks it up and an undeclared property throws
+		*  the mapped method takes `($query, $key, $direction)`, in that order, and the key resolves the same way `$scopes` does — declared with dots, reached with underscores
 
 * map and expose additional **Filter Scopes** to the client method 
 	* solves issue of how do I Filter on properties foreign to the database definition of the object?
@@ -336,7 +354,7 @@ A worked example lives at [example/Requests/ExampleStoreRequest.php](example/Req
 
 	* `$sortable` is the same list for `?sort=`, kept separate so a column can be orderable without being filterable
 
-	* A scope declared with dots answers to underscores, so `widget.type.id` is reached as `?widget_type_id=`. When a **column of that same name also exists**, the key means two things and the request is rejected with `AmbiguousQueryParamException` rather than silently taking the scope. List the column in `$filterable` to make it win, or rename the scope. Sorting is unaffected — `$sortScopes` keys are matched exactly, with no underscore-to-dot step
+	* A scope declared with dots answers to underscores, so `widget.type.id` is reached as `?widget_type_id=`. When a **column of that same name also exists**, the key means two things and the request is rejected with `AmbiguousQueryParamException` rather than silently taking the scope. List the column in `$filterable` to make it win, or rename the scope. `$sortScopes` resolves and collides the same way, settled by `$sortable`
 
 *  **WITH** Returns relations and can be passed in one of 2 ways
 
@@ -371,6 +389,10 @@ A worked example lives at [example/Requests/ExampleStoreRequest.php](example/Req
 *  **SORT**
 
 	* Sort the results asc or desc based on a column listed in the Service's `$sortable`, or a key mapped in `$sortScopes`
+
+	* A sort scope is how you order by something that is not a column on the table — a related row's name, a computed rank. The mapped method is called as `scopeName($query, $key, $direction)`
+
+	* `$sortScopes` keys resolve like `$scopes`: declared `type.name`, reached as `?sort=type_name_ASC`. The parser splits the direction off the last underscore first, so the key that reaches the Service is always underscored
 
 	*  **Sort** key pattern = `{property}_{order (ASC|DESC)}`
 

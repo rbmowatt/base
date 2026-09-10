@@ -36,8 +36,11 @@ class ExampleModel extends BaseModel implements ExampleModelInterface
     * A sort scope, mapped from the `account_type` sort param by ExampleService.
     * Sort scopes are handed the key and the direction, in that order.
     */
-    public function scopeSortByAccountType($query, $key, $direction)
+    public function scopeSortByWidgetTypeName($query, $key, $direction)
     {
-        return $query->orderBy('account_type', $direction);
+        return $query->orderBy(
+            WidgetType::select('name')->whereColumn('widget_types.id', 'example.widget_type_id'),
+            $direction
+        );
     }
 }

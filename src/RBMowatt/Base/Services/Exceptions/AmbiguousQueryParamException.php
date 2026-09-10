@@ -3,30 +3,44 @@
 use RBMowatt\Base\Exception;
 
 /**
-* Raised when a filter key could mean two different things.
+* Raised when a query key could mean two different things.
 *
-* isScope() maps a key to a scope by swapping underscores for dots, so the scope
-* `widget.type.id` answers to `?widget_type_id=`. When a column of that exact name
-* also exists and the Service has not listed it in $filterable, both readings are
-* available, and picking either one silently means a caller asking to filter a
-* column can get a scope applied instead with no indication.
+* $scopes and $sortScopes both map a key by swapping underscores for dots, so a
+* scope declared `widget.type.id` answers to `?widget_type_id=`. When a column of
+* that name also exists and the Service has not allowlisted it, both readings are
+* live, and picking either one silently hands the caller a filter or an ordering
+* they did not ask for.
 *
-* Listing the column in $filterable is the disambiguation: an explicit allowlist
-* entry means the column wins. Renaming the scope key is the other way out.
+* The allowlist is the disambiguation: an explicit $filterable entry (or $sortable,
+* for a sort) means the column wins. Renaming the scope key is the other way out.
 */
 class AmbiguousQueryParamException extends Exception
 {
     protected $scopeKey;
 
-    public function __construct($key, $scopeKey, $message = null, $code = 0) {
+    protected $allowlist;
+
+    /**
+    * @param string $key the request key that resolved two ways
+    * @param string $scopeKey the declared scope key it matched
+    * @param string $allowlist the Service property that settles it, without the $
+    */
+    public function __construct($key, $scopeKey, $allowlist = 'filterable', $message = null, $code = 0) {
         $this->scopeKey = $scopeKey;
+        $this->allowlist = $allowlist;
         $message = $message ?: sprintf(
             'Query parameter [%s] matches both a column and the scope [%s]. '
-            . 'List the column in $filterable to filter on it, or rename the scope.',
+            . 'List the column in $%s to use the column, or rename the scope.',
             $key,
-            $scopeKey
+            $scopeKey,
+            $allowlist
         );
         parent::__construct($message, $code);
+    }
+
+    public function getAllowlist()
+    {
+        return $this->allowlist;
     }
 
     public function getScopeKey()
