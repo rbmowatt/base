@@ -59,8 +59,6 @@ class ExampleTest extends TestCase
         ExampleModel::create(['name' => 'alpha', 'widget_type_id' => 1, 'account_type' => 'b']);
         ExampleModel::create(['name' => 'beta', 'widget_type_id' => 2, 'account_type' => 'a']);
         ExampleModel::create(['name' => 'gamma', 'widget_type_id' => 1, 'account_type' => 'c']);
-
-        $_SERVER['REQUEST_URI'] = '/api/example';
     }
 
     private function controller(array $query, string $method = 'GET'): ExampleApiController
