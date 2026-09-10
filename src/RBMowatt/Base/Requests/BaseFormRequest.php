@@ -13,9 +13,34 @@ class BaseFormRequest extends FormRequest
 {
     protected $queryParser;
 
-    public function __construct()
-    {
-        parent::__construct();
+    /**
+    * Symfony's Request::create() builds the instance as
+    * new static($query, $request, $attributes, $cookies, $files, $server, $content).
+    * This used to declare no parameters and call parent::__construct() with none,
+    * so all seven were accepted and thrown away: ExampleRequest::create('/x','POST',
+    * ['name' => 'delta']) produced a request whose all() was empty, and every rule
+    * came back "field is required". Laravel's own resolution path hides it, because
+    * FormRequestServiceProvider constructs with no arguments and then copies the
+    * real request in with createFrom().
+    *
+    * @param array<string, mixed> $query
+    * @param array<string, mixed> $request
+    * @param array<string, mixed> $attributes
+    * @param array<string, mixed> $cookies
+    * @param array<string, mixed> $files
+    * @param array<string, mixed> $server
+    * @param string|resource|null $content
+    */
+    public function __construct(
+        array $query = [],
+        array $request = [],
+        array $attributes = [],
+        array $cookies = [],
+        array $files = [],
+        array $server = [],
+        $content = null
+    ) {
+        parent::__construct($query, $request, $attributes, $cookies, $files, $server, $content);
         $this->queryParser = App::make(QueryParser::class);
     }
 
