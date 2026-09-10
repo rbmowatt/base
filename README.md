@@ -19,6 +19,8 @@ Requires PHP 8.3 or 8.4 and Laravel 11, 12 or 13.
 
 -  [Controllers](#controllers)
 
+-  [Requests](#requests)
+
 -  [Models](#models)
 
 -  [Usage](#usage)
@@ -247,6 +249,63 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 	- Should **ALWAYS** have their **Dependencies** injected
 
 	- except in the case of needing **CONSTANTS**
+
+### Requests
+
+Validation belongs in a **[BaseFormRequest](src/RBMowatt/Base/Requests/BaseFormRequest.php)**, not in the Controller and not in the Service. A Service is a query surface; the moment it starts checking whether a payload is well-formed it is doing two jobs. Type-hint the request on the action and Laravel validates during injection, before the action body runs.
+
+```php
+class WidgetStoreRequest extends BaseFormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user() !== null;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'type_id' => ['required', 'integer', 'exists:widget_types,id'],
+        ];
+    }
+
+    // runs after the rules pass, so anything needing validated values or a
+    // loaded record goes here rather than in authorize()
+    protected function checkPermissions($validator)
+    {
+        if ($this->input('scope') === 'internal' && !$this->user()->is_admin) {
+            $this->throwPermissionsException('Only an admin can do that.');
+        }
+    }
+}
+```
+
+```php
+public function store(WidgetStoreRequest $request)
+{
+    return $this->response->ok($this->widgetService->create($request->validated()));
+}
+```
+
+Two things worth knowing:
+
+* `validated()` returns only the keys the rules named, so it pairs with the model's `$fillable` as a first gate. A key that passes validation but is not fillable still raises `MassAssignmentException`
+
+* **The Controller's `try/catch` cannot catch these.** Validation and `checkPermissions()` run while Laravel is resolving the request for injection, which is before the action body exists. The host app's exception handler is what renders them, so wire it up:
+
+	```php
+	// bootstrap/app.php
+	->withExceptions(function (Exceptions $exceptions) {
+	    $exceptions->render(function (RBMowatt\Base\Exception $e, $request) {
+	        return ApiResponse::make()->exception($e, 400);
+	    });
+	})
+	```
+
+	`ValidationException` extends `RBMowatt\Base\Exception`, and `ApiResponse::exception()` routes it to `validationError()` for a `422` with the message bag attached.
+
+A worked example lives at [example/Requests/ExampleStoreRequest.php](example/Requests/ExampleStoreRequest.php).
 
 ### Models
 
