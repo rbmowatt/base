@@ -4,6 +4,7 @@ namespace RBMowatt\BaseTests;
 
 use Illuminate\Http\Request;
 use RBMowatt\Base\Rest\Query\QueryParser;
+use RBMowatt\Base\Services\Exceptions\SortException;
 
 class LimitClampTest extends TestCase
 {
@@ -60,5 +61,15 @@ class LimitClampTest extends TestCase
         };
 
         $this->assertSame(5000, $parser->getLimit());
+    }
+
+    public function testABadSortOrderStaysAReadableClientError(): void
+    {
+        // a bare \Exception here would be redacted to 'Server Error' by ApiResponse,
+        // which is the wrong answer for a caller who simply typed the key wrong
+        $this->expectException(SortException::class);
+        $this->expectExceptionMessage('Invalid Sort Order');
+
+        $this->parser(['sort' => 'name_SIDEWAYS'])->getSorts();
     }
 }

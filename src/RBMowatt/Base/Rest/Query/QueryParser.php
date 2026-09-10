@@ -1,9 +1,9 @@
 <?php namespace RBMowatt\Base\Rest\Query;
 
-use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use RBMowatt\Base\Rest\Exceptions\MissingParameterException;
+use RBMowatt\Base\Services\Exceptions\SortException;
 
 class QueryParser
 {
@@ -79,7 +79,10 @@ class QueryParser
       $p = explode(self::SORT_DELIMITER, $filter);
       if(!in_array($direction = trim(array_pop($p)), $this->validSortOrders))
       {
-        throw new Exception('Invalid Sort Order ' . $direction);
+        // A SortException rather than a bare \Exception: ApiResponse only echoes
+        // this package's own exception messages back with debug off, so a plain
+        // one turned a client's bad sort key into an opaque 'Server Error'.
+        throw new SortException('Invalid Sort Order ' . $direction);
       }
       $sorts[] = [implode(self::SORT_DELIMITER, $p), $direction];
     }
