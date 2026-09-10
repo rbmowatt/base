@@ -427,6 +427,10 @@ An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standard
 
 	* IF error exists, human readable message
 
+	* With `app.debug` off, only exceptions extending `RBMowatt\Base\Exception` are echoed back — those messages are written for the caller. Anything else renders as `ApiResponse::REDACTED_MESSAGE` and the real exception goes to the log. `QueryException` is why: its message carries the executed SQL with bindings already interpolated, so an unredacted envelope let a client enumerate the schema a column name at a time and read row data out of a failed write. Correlate a redacted body with its log line using `responseId`
+
+	* With `app.debug` on, the message is followed by `FILE::` and `LINE::` as before. Do not run production with debug on
+
 *  `errorCode`
 
 	*  **[Error Code](src/RBMowatt/Base/ErrorCodes.php)** Associated With message

@@ -51,6 +51,12 @@ class ApiResponse implements ApiResponseInterface
 
     const FAILED_VALIDATION_CODE = 422;
 
+    /**
+    * What the `error` field carries with debug off for anything that is not one
+    * of this package's own exceptions.
+    */
+    const REDACTED_MESSAGE = 'Server Error';
+
     public function __construct($content = '', $status = 200, $headers = array())
     {
         $this->statusCode = (int) $status;
@@ -200,16 +206,30 @@ class ApiResponse implements ApiResponseInterface
     * config:cache, env() outside of config files returns null, so an
     * env-based check silently picks the wrong branch in production.
     *
+    * With debug off only this package's own exceptions are echoed back, because
+    * those messages are written for the caller. Everything else is replaced. A
+    * QueryException is the reason: its getMessage() carries the whole statement
+    * with the bindings already interpolated, so `?select=no_such_column` returned
+    * the table's real SQL to the client and turned a 500 into remote schema
+    * enumeration, and a failed INSERT returned the row being written.
+    *
+    * The envelope's responseId is what ties the redacted body to the logged
+    * exception.
+    *
     * @param Exception $e
     * @return string
     */
     public function formatException(Exception $e)
     {
-        if (!Config::get('app.debug', false))
+        if (Config::get('app.debug', false))
+        {
+            return $e->getMessage() . ', FILE:: ' . $e->getFile() . ', LINE:: ' . $e->getLine();
+        }
+        if ($e instanceof BaseException)
         {
             return $e->getMessage();
         }
-        return $e->getMessage() . ', FILE:: ' . $e->getFile() . ', LINE:: ' . $e->getLine();
+        return self::REDACTED_MESSAGE;
     }
     /**
     * Set the data manually

@@ -21,13 +21,14 @@ class ApiResponseTest extends TestCase
         $this->assertStringContainsString('LINE::', $formatted);
     }
 
-    public function testDebugOffLeaksNeitherFileNorLine(): void
+    public function testDebugOffRedactsAForeignException(): void
     {
         Config::set('app.debug', false);
 
         $formatted = (new ApiResponse())->formatException(new Exception('boom'));
 
-        $this->assertSame('boom', $formatted);
+        $this->assertSame(ApiResponse::REDACTED_MESSAGE, $formatted);
+        $this->assertStringNotContainsString('boom', $formatted);
     }
 
     public function testUidIsNullWithoutAnAuthBinding(): void
@@ -113,7 +114,8 @@ class ApiResponseTest extends TestCase
             ->exception(new Exception('boom'), 500, false)
             ->getData(true);
 
-        $this->assertSame('boom', $payload['error']);
+        $this->assertSame(ApiResponse::REDACTED_MESSAGE, $payload['error']);
+        $this->assertStringNotContainsString('boom', $payload['error']);
         $this->assertSame(ErrorCodes::NO_IDEA, $payload['errorCode']);
         $this->assertSame(500, $payload['statusCode']);
     }
