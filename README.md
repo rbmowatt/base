@@ -27,6 +27,8 @@ Requires PHP 8.3 or 8.4 and Laravel 11, 12 or 13.
 
 -  [Tests](#tests)
 
+-  [Static Analysis](#static-analysis)
+
 
 ## Install
 

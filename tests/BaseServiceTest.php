@@ -80,13 +80,20 @@ class BaseServiceTest extends TestCase
         Gizmo::create(['name' => 'beta', 'type_id' => 2]);
         GizmoPart::create(['gizmo_id' => 1, 'label' => 'bolt']);
         GizmoPart::create(['gizmo_id' => 1, 'label' => 'nut']);
-
-        $_SERVER['REQUEST_URI'] = '/api/gizmo';
     }
 
     private function service(): GizmoService
     {
         return new GizmoService(new Gizmo());
+    }
+
+    public function testPaginationLinksComeFromTheRequest(): void
+    {
+        $this->app->instance('request', \Illuminate\Http\Request::create('/api/gizmo?type_id=1'));
+
+        $results = $this->service()->where([], [], [], [], 1);
+
+        $this->assertSame('/api/gizmo?type_id=1&page=2', $results->getMeta('next_page_url'));
     }
 
     public function testEagerLoadsARequestedRelation(): void
