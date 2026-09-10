@@ -7,7 +7,8 @@ trait PageAndLimitTrait
     /**
     * query scope nPerGroup
     *
-    * @return void
+    * @param \Illuminate\Database\Eloquent\Builder<static> $query
+    * @return \Illuminate\Database\Eloquent\Builder<static>
     */
     public function scopeLimitTo($query, $group, $n = 10)
     {
@@ -24,8 +25,8 @@ trait PageAndLimitTrait
         }
 
         // make sure column aliases are unique
-        $groupAlias = 'group_'.md5(time());
-        $rankAlias  = 'rank_'.md5(time());
+        $groupAlias = 'group_'.md5((string) time());
+        $rankAlias  = 'rank_'.md5((string) time());
 
         // apply mysql variables
         $query->addSelect(DB::raw(
@@ -53,7 +54,8 @@ trait PageAndLimitTrait
     /**
     * query scope nPerGroup
     *
-    * @return void
+    * @param \Illuminate\Database\Eloquent\Builder<static> $query
+    * @return \Illuminate\Database\Eloquent\Builder<static>
     */
     public function scopePage($query, $group, $offset=1, $n = 10)
     {
@@ -68,8 +70,8 @@ trait PageAndLimitTrait
         }
 
         // make sure column aliases are unique
-        $groupAlias = 'group_'.md5(time());
-        $rankAlias  = 'rank_'.md5(time());
+        $groupAlias = 'group_'.md5((string) time());
+        $rankAlias  = 'rank_'.md5((string) time());
 
         // apply mysql variables
         $query->addSelect(DB::raw(
@@ -100,7 +102,8 @@ trait PageAndLimitTrait
         /**
         * query scope nPerGroup
         *
-        * @return void
+        * @param \Illuminate\Database\Eloquent\Builder<static> $query
+        * @return \Illuminate\Database\Eloquent\Builder<static>
         */
         public function scopePt($query, $group, $offset=1, $n = 10)
         {

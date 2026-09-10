@@ -1,0 +1,12 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+    excludePaths:
+        analyse:
+            # BaseTestCase extends the host app's Tests\TestCase, which only exists
+            # inside a consuming application, so it cannot be resolved here.
+            - src/RBMowatt/Base/Tests

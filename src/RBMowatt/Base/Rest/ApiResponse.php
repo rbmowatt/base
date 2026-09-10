@@ -22,6 +22,23 @@ use RBMowatt\Base\Rest\Exceptions\ValidationException;
 * declares setStatusCode(int $code, ?string $text = null): static, so the loose
 * single-argument override this class needs is a fatal signature conflict against
 * any Symfony 6+.
+*
+* Envelope fields are read and written through __get/__set onto $_contents, so any
+* key set here reaches the JSON payload. These are the ones the package itself sets.
+*
+* @property bool $success
+* @property string|null $href
+* @property string|null $app
+* @property mixed $uid
+* @property string $time
+* @property int $statusCode
+* @property string $responseId
+* @property mixed $error
+* @property mixed $errorCode
+* @property string $version
+* @property mixed $data
+* @property array $meta
+* @property \Illuminate\Support\MessageBag $validationErrors
 */
 class ApiResponse
 {
@@ -39,10 +56,10 @@ class ApiResponse
         $this->headers = $headers;
         $this->_contents = array(
             'success'=>false,
-            'href' => isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI']: 'N/A',
+            'href' => $this->resolveHref(),
             'app' => Config::get('app.name', '[app.name] not set '),
             'uid'=>  NULL,
-            'time' => date('y-m-d H:i:s'),
+            'time' => date('c'),
             'statusCode' => $status,
             // 32 hex chars, same shape md5(time()) produced, so log greps keep working.
             // md5(time()) handed every response in the same second an identical id,
@@ -50,7 +67,9 @@ class ApiResponse
             'responseId' => bin2hex(random_bytes(16)),
             'error' => NULL,
             'errorCode'=>NULL,
-            'version'=> function_exists('getVersion') ? getVersion() : 'undefined'
+            // app.version is not a Laravel default. The getVersion() branch is only
+            // for apps still declaring the helper this package used to autoload.
+            'version'=> Config::get('app.version') ?? (function_exists('getVersion') ? getVersion() : 'undefined')
         );
         if ($content !== '' && $content !== null) {
             $this->_contents['data'] = $content;
@@ -223,9 +242,9 @@ class ApiResponse
         // No JSON_NUMERIC_CHECK: it coerced every numeric-looking string in the
         // payload, so "07005" shipped as 7005, "1.10" as 1.1, and ids past
         // 2^53 landed outside what a JS client can parse back without loss.
-        $jr = new JsonResponse($this->_contents, $this->getStatusCode(), $this->headers);
-        return $jr->withHeaders(['Access-Control-Allow-Origin'=>'*',
-        'Access-Control-Allow-Methods'=>'GET, POST, PUT, DELETE, OPTIONS']);
+        // CORS is the host app's HandleCors middleware to set. Sending
+        // Access-Control-Allow-Origin from here overrode whatever it configured.
+        return new JsonResponse($this->_contents, $this->getStatusCode(), $this->headers);
     }
     /**
     * Turn the response to an array instead of json
@@ -248,6 +267,20 @@ class ApiResponse
         // response, not just the authenticated ones. Auth::id() also avoids
         // assuming the user model exposes an `id` property.
         $this->_contents['uid'] = App::bound('auth') ? Auth::id() : null;
+    }
+
+    /**
+     * The URI of the request this response answers, or null when none is bound.
+     *
+     * The container's request is the one being handled. $_SERVER is process-global,
+     * so on any long-lived worker it holds whatever the process started with rather
+     * than the current request, and href drifted or came back 'N/A'.
+     *
+     * @return string|null
+     */
+    protected function resolveHref()
+    {
+        return App::bound('request') ? App::make('request')->getRequestUri() : null;
     }
 
     /**

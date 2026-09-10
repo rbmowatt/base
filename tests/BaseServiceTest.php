@@ -39,6 +39,15 @@ class GizmoService extends BaseService
 
 class BaseServiceTest extends TestCase
 {
+    public function testGetModelTakesNoArgument(): void
+    {
+        $service = new GizmoService(new Gizmo());
+        $swapped = new GizmoPart();
+
+        $this->assertInstanceOf(Gizmo::class, $service->getModel());
+        $this->assertSame($swapped, $service->setModel($swapped)->getModel());
+    }
+
     protected function defineEnvironment($app)
     {
         $app['config']->set('database.default', 'testing');
@@ -120,6 +129,22 @@ class BaseServiceTest extends TestCase
 
         $this->assertCount(1, $aggregates);
         $this->assertStringNotContainsString('limit', $aggregates[0]);
+    }
+
+    /**
+     * select() used to read getTable() off whatever eagerLoad() returned. With any
+     * relation requested that is a Builder, which forwards unknown calls to the
+     * query builder, so asking for relations and selects together was a
+     * BadMethodCallException.
+     */
+    public function testFindTakesRelationsAndSelectsTogether(): void
+    {
+        $gizmo = Gizmo::first();
+
+        $found = $this->service()->find($gizmo->id, ['parts'], ['id', 'name']);
+
+        $this->assertSame(['id', 'name', 'parts'], array_keys($found->toArray()));
+        $this->assertCount(2, $found->parts);
     }
 
     public function testBareSelectsAreQualifiedWithTheTable(): void

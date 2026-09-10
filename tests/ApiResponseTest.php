@@ -3,6 +3,7 @@
 namespace RBMowatt\BaseTests;
 
 use Exception;
+use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\Config;
 use RBMowatt\Base\ErrorCodes;
 use RBMowatt\Base\Rest\ApiResponse;
@@ -115,5 +116,71 @@ class ApiResponseTest extends TestCase
         $this->assertSame('boom', $payload['error']);
         $this->assertSame(ErrorCodes::NO_IDEA, $payload['errorCode']);
         $this->assertSame(500, $payload['statusCode']);
+    }
+
+    public function testHrefComesFromTheBoundRequest(): void
+    {
+        $this->app->instance('request', HttpRequest::create('/v1/widgets?limit=5'));
+
+        $this->assertSame('/v1/widgets?limit=5', (new ApiResponse())->ok([])->getData(true)['href']);
+    }
+
+    public function testHrefFollowsTheCurrentRequestNotTheProcess(): void
+    {
+        $this->app->instance('request', HttpRequest::create('/v1/widgets'));
+        $first = (new ApiResponse())->ok([])->getData(true)['href'];
+
+        $this->app->instance('request', HttpRequest::create('/v1/gadgets?page=2'));
+        $second = (new ApiResponse())->ok([])->getData(true)['href'];
+
+        $this->assertSame('/v1/widgets', $first);
+        $this->assertSame('/v1/gadgets?page=2', $second);
+    }
+
+    public function testHrefIsNullWithNoRequestBound(): void
+    {
+        $this->app->offsetUnset('auth');
+        $this->app->offsetUnset('request');
+
+        $this->assertNull((new ApiResponse())->ok([])->getData(true)['href']);
+    }
+
+    public function testTimeIsIso8601WithAnOffset(): void
+    {
+        $time = (new ApiResponse())->ok([])->getData(true)['time'];
+
+        $this->assertNotFalse(\DateTimeImmutable::createFromFormat(DATE_ATOM, $time));
+    }
+
+    public function testNoCorsHeadersAreSet(): void
+    {
+        $headers = (new ApiResponse())->ok([])->headers;
+
+        $this->assertFalse($headers->has('Access-Control-Allow-Origin'));
+        $this->assertFalse($headers->has('Access-Control-Allow-Methods'));
+    }
+
+    public function testExplicitHeadersStillReachTheResponse(): void
+    {
+        $headers = (new ApiResponse())
+            ->withHeaders(['X-Request-Source' => 'test'])
+            ->ok([])
+            ->headers;
+
+        $this->assertSame('test', $headers->get('X-Request-Source'));
+    }
+
+    public function testVersionComesFromAppConfig(): void
+    {
+        Config::set('app.version', '2.4.1');
+
+        $this->assertSame('2.4.1', (new ApiResponse())->ok([])->getData(true)['version']);
+    }
+
+    public function testVersionFallsBackToUndefined(): void
+    {
+        Config::set('app.version', null);
+
+        $this->assertSame('undefined', (new ApiResponse())->ok([])->getData(true)['version']);
     }
 }
