@@ -9,12 +9,17 @@
         "rest",
         "scaffolding"
     ],
+    "homepage": "https://github.com/rbmowatt/base",
     "authors": [
         {
             "name": "Richard Mowatt",
             "email": "richmowatt@gmail.com"
         }
     ],
+    "support": {
+        "issues": "https://github.com/rbmowatt/base/issues",
+        "source": "https://github.com/rbmowatt/base"
+    },
     "require": {
         "php": "^8.3",
         "illuminate/support": "^11.0|^12.0|^13.0",
