@@ -312,6 +312,8 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	* Paths are capped at `$maxRelationDepth` hops (default 3) because each hop is a query plus a count
 
+	* The relation map each hop is checked against is cached per model class for 24h, the same as `columns()`. Discovery reflects the class and builds a relation object for every relation method on it to read the related class, which is far too much to repeat per request. Add or rename a relation and clear the cache on deploy
+
 	* A relation you declare is a relation callers can pull. Use `$hidden` on the related model for fields that should not travel with it
 
 

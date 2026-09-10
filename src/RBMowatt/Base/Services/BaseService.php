@@ -514,10 +514,13 @@ abstract class BaseService implements ServiceInterface
                 // is no relationships() on it to check the next hop against
                 return false;
             }
-            if (!array_key_exists($segment, $current->relationships())) {
+            // read the related class out of the map already in hand rather than
+            // calling getRelationshipModel(), which asks for the whole map again
+            $relations = $current->relationships();
+            if (!array_key_exists($segment, $relations)) {
                 return false;
             }
-            $current = $current->getRelationshipModel($segment);
+            $current = App::make($relations[$segment]['model']);
         }
         return true;
     }
