@@ -2,9 +2,9 @@
 
 [![tests](https://github.com/rbmowatt/base/actions/workflows/tests.yml/badge.svg)](https://github.com/rbmowatt/base/actions/workflows/tests.yml)
 
-Scaffold a Laravel 13 REST API from a base Service, Model and Controller. Filtering, relations, sorting and pagination come off the query string, and every response goes back in the same envelope.
+Scaffold a Laravel REST API from a base Service, Model and Controller. Filtering, relations, sorting and pagination come off the query string, and every response goes back in the same envelope.
 
-Requires PHP 8.3 or 8.4 and Laravel 13.
+Requires PHP 8.3 or 8.4 and Laravel 11, 12 or 13.
 
 ## Contents
 -  [Install](#install)
@@ -443,5 +443,5 @@ composer install
 vendor/bin/phpunit
 ```
 
-CI runs the same suite on PHP 8.3 and 8.4 for every push and pull request.
+CI runs the same suite across PHP 8.3 and 8.4 against Laravel 11, 12 and 13 for every push and pull request. The framework version is pinned through testbench: 9 pulls Laravel 11, 10 pulls 12, 11 pulls 13.
 
