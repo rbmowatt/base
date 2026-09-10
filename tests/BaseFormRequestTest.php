@@ -61,4 +61,32 @@ class BaseFormRequestTest extends TestCase
 
         return $request->setContainer($this->app);
     }
+
+    public function testConstructorArgumentsReachTheRequest(): void
+    {
+        // Symfony's Request::create() passes seven constructor arguments; a
+        // no-argument constructor swallowed all of them and produced an empty
+        // request, so every validation rule reported "field is required"
+        $request = AllowingRequest::create('/api/thing', 'POST', ['name' => 'delta']);
+
+        $this->assertSame(['name' => 'delta'], $request->all());
+        $this->assertSame('delta', $request->input('name'));
+    }
+
+    public function testQueryStringSurvivesConstruction(): void
+    {
+        $request = AllowingRequest::create('/api/thing?limit=5', 'GET');
+
+        $this->assertSame('5', $request->query('limit'));
+    }
+
+    public function testTheQueryParserIsStillWiredUp(): void
+    {
+        $request = AllowingRequest::create('/api/thing', 'POST', ['name' => 'delta']);
+
+        $this->assertInstanceOf(
+            \RBMowatt\Base\Rest\Query\QueryParser::class,
+            (new \ReflectionProperty($request, 'queryParser'))->getValue($request)
+        );
+    }
 }

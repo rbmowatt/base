@@ -8,8 +8,8 @@ use RBMowatt\Base\Rest\Exceptions\ValidationException;
 use RBMowatt\Base\Rest\Traits\RestValidationTrait;
 
 /**
- * Deliberately not a controller: the trait used to read self::REQUIRED, which
- * only existed on BaseApiController.
+ * Deliberately not a controller: the trait has to work outside the BaseApiController
+ * hierarchy, which is where self::REQUIRED would otherwise have to live.
  */
 class StandaloneValidator
 {

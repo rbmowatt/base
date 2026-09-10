@@ -7,11 +7,14 @@ use Example\ExampleServiceProvider;
 use Example\Models\ExampleModel;
 use Example\Models\Interfaces\ExampleModelInterface;
 use Example\Models\WidgetType;
+use Example\Requests\ExampleStoreRequest;
 use Example\Services\ExampleService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use RBMowatt\Base\Exception as BaseException;
 use RBMowatt\Base\Rest\ApiResponse;
+use RBMowatt\Base\Rest\Exceptions\ValidationException;
 use RBMowatt\Base\Rest\Query\QueryParser;
 
 /**
@@ -117,10 +120,28 @@ class ExampleTest extends TestCase
         $this->assertSame(3, $payload['data']);
     }
 
+    /**
+    * Build the FormRequest the way Laravel would when injecting it: resolved out
+    * of the container, with a user attached, then validated.
+    *
+    * @param array<string, mixed> $payload
+    */
+    private function storeRequest(array $payload, bool $admin = true): ExampleStoreRequest
+    {
+        $request = ExampleStoreRequest::create('/api/example', 'POST', $payload);
+        $request->setContainer($this->app);
+        $request->setUserResolver(function () use ($admin) {
+            return (object) ['id' => 1, 'is_admin' => $admin];
+        });
+        $request->validateResolved();
+
+        return $request;
+    }
+
     public function testShowStoreUpdateDestroy(): void
     {
         $created = $this->controller([], 'POST')
-            ->store(Request::create('/api/example', 'POST', [
+            ->store($this->storeRequest([
                 'name' => 'delta',
                 'widget_type_id' => 1,
                 'account_type' => 'd',
@@ -148,5 +169,43 @@ class ExampleTest extends TestCase
 
         $this->assertFalse($payload['success']);
         $this->assertStringContainsString('Relation Does Not Exist', $payload['error']);
+    }
+
+    public function testTheFormRequestRejectsAnInvalidPayloadBeforeTheAction(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $this->storeRequest(['widget_type_id' => 1]);
+    }
+
+    public function testTheFormRequestRejectsAWidgetTypeThatDoesNotExist(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $this->storeRequest(['name' => 'delta', 'widget_type_id' => 9999]);
+    }
+
+    public function testCheckPermissionsRunsAfterTheRulesPass(): void
+    {
+        $this->expectException(BaseException::class);
+        $this->expectExceptionMessage('Only an admin can create an internal account.');
+
+        $this->storeRequest([
+            'name' => 'delta',
+            'widget_type_id' => 1,
+            'account_type' => 'internal',
+        ], false);
+    }
+
+    public function testValidatedTrimsThePayloadToTheRules(): void
+    {
+        // the Service's $fillable is the second gate; this is the first
+        $request = $this->storeRequest([
+            'name' => 'delta',
+            'widget_type_id' => 1,
+            'not_a_rule' => 'dropped',
+        ]);
+
+        $this->assertArrayNotHasKey('not_a_rule', $request->validated());
     }
 }

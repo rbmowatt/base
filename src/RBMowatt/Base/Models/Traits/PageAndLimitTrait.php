@@ -1,9 +1,61 @@
 <?php namespace RBMowatt\Base\Models\Traits;
 
 use Illuminate\Support\Facades\DB;
+use RBMowatt\Base\Models\Exceptions\InvalidArgumentsException;
 
 trait PageAndLimitTrait
 {
+    /**
+    * Resolve $group to a column on this model, quoted for the grammar.
+    *
+    * All three scopes below build their MySQL user-variable trick with DB::raw, and
+    * $group lands inside that string. It is reachable from a request:
+    * BaseService::setWheres() calls a mapped scope as $model->{$scope}($value, $op),
+    * so a service declaring `$scopes = ['group' => 'limitTo']` hands the caller's
+    * string to it, and interpolating that directly yields
+    * `@group = 1) UNION SELECT password_hash,1,1 FROM accts -- ` inside the SELECT.
+    *
+    * A binding cannot stand in for a column reference here, so the value is checked
+    * against the real column list and then quoted — the same thing the query grammar
+    * does for a column it is given properly.
+    *
+    * @param  \Illuminate\Database\Eloquent\Builder<static> $query
+    * @param  mixed $group
+    * @return string
+    * @throws InvalidArgumentsException
+    */
+    protected function resolveGroupColumn($query, $group)
+    {
+        if (!is_string($group) || !in_array($group, $this->columns(), true))
+        {
+            throw new InvalidArgumentsException(
+                'Grouping column must be a column on ' . $this->getTable()
+            );
+        }
+
+        return $query->getQuery()->getGrammar()->wrap($this->getTable() . '.' . $group);
+    }
+
+    /**
+    * The row count per group, as a positive int.
+    *
+    * setWheres() passes a scope (value, operator), so a service that maps a request
+    * key onto one of these scopes hands the operator in as $n. Anything that is not
+    * a positive number is not a row count.
+    *
+    * @param  mixed $n
+    * @return int
+    * @throws InvalidArgumentsException
+    */
+    protected function resolveGroupSize($n)
+    {
+        if (!is_numeric($n) || (int) $n < 1)
+        {
+            throw new InvalidArgumentsException('Group size must be a positive integer');
+        }
+
+        return (int) $n;
+    }
     /**
     * query scope nPerGroup
     *
@@ -14,6 +66,8 @@ trait PageAndLimitTrait
     {
         // queried table
         $table = ($this->getTable());
+        $group = $this->resolveGroupColumn($query, $group);
+        $n = $this->resolveGroupSize($n);
 
         // initialize MySQL variables inline
         $query->from( DB::raw("(SELECT @rank:=0, @group:=0) as vars, {$table}") );
@@ -60,6 +114,9 @@ trait PageAndLimitTrait
     public function scopePage($query, $group, $offset=1, $n = 10)
     {
         $table = ($this->getTable());
+        $group = $this->resolveGroupColumn($query, $group);
+        $n = $this->resolveGroupSize($n);
+        $offset = $this->resolveGroupSize($offset);
         $query->from( DB::raw("(SELECT @rank:=0, @group:=0 ) as vars, {$table}") );
 
 
@@ -109,6 +166,9 @@ trait PageAndLimitTrait
         {
             $nq = $this->newQuery();
             $table = ($this->getTable());
+            $group = $this->resolveGroupColumn($query, $group);
+            $n = $this->resolveGroupSize($n);
+            $offset = $this->resolveGroupSize($offset);
             // initialize MySQL variables inline
             $nq->from( DB::raw("(SELECT @rank:=0, @group:=0 ) as vars, {$table}") );
 

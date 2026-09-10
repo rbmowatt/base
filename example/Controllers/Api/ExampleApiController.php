@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use RBMowatt\Base\Controllers\Api\BaseApiController;
 use RBMowatt\Base\Rest\ApiResponse;
 use RBMowatt\Base\Rest\Query\QueryParser;
+use Example\Requests\ExampleStoreRequest;
 use Example\Services\ExampleService;
 
 class ExampleApiController extends BaseApiController
@@ -69,14 +70,20 @@ class ExampleApiController extends BaseApiController
 
     /**
     * Create A New entity
-    * @param  Request $request
+    *
+    * Takes ExampleStoreRequest rather than Request: validation and the permission
+    * check run during injection, before this body, so neither the Controller nor
+    * the Service has to carry them. validated() hands the Service exactly the keys
+    * the rules named, which is what the model's $fillable then accepts.
+    *
+    * @param  ExampleStoreRequest $request
     * @return \Illuminate\Http\JsonResponse
     */
-    public function store(Request $request)
+    public function store(ExampleStoreRequest $request)
     {
         try
         {
-            $result = $this->exampleService->create($request->all());
+            $result = $this->exampleService->create($request->validated());
             return $this->response->ok($result);
         }
         catch( Exception $e )

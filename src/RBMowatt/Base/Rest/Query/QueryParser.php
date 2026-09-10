@@ -1,9 +1,9 @@
 <?php namespace RBMowatt\Base\Rest\Query;
 
-use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use RBMowatt\Base\Rest\Exceptions\MissingParameterException;
+use RBMowatt\Base\Services\Exceptions\SortException;
 
 class QueryParser
 {
@@ -21,8 +21,15 @@ class QueryParser
 
   const DEFAULT_LIMIT = 20;
   const DEFAULT_PAGE = 1;
+  const MAX_LIMIT = 100;
   const SORT_DELIMITER = '_';
   const IN_CLAUSE = 'IN';
+
+  /*
+  The ceiling getLimit() clamps to. Subclass and raise it for an endpoint that
+  genuinely serves bigger pages; bind the subclass in place of QueryParser.
+  */
+  protected $maxLimit = self::MAX_LIMIT;
 
   public function __construct( Request $request )
   {
@@ -72,7 +79,10 @@ class QueryParser
       $p = explode(self::SORT_DELIMITER, $filter);
       if(!in_array($direction = trim(array_pop($p)), $this->validSortOrders))
       {
-        throw new Exception('Invalid Sort Order ' . $direction);
+        // A SortException rather than a bare \Exception: ApiResponse only echoes
+        // this package's own exception messages back with debug off, so a plain one
+        // reaches the caller as an opaque 'Server Error' for a key they mistyped.
+        throw new SortException('Invalid Sort Order ' . $direction);
       }
       $sorts[] = [implode(self::SORT_DELIMITER, $p), $direction];
     }
@@ -106,11 +116,16 @@ class QueryParser
   }
   /**
   * get the limit on records to be returned
+  *
+  * Clamped to $maxLimit and returned as an int. An unclamped value goes straight
+  * into paginate(), where ?limit=1000000 is a one-request table dump and a memory
+  * spike, and ?limit=abc arrives as the string 'abc'.
+  *
   * @return int
   */
   public function getLimit()
   {
-    return ($this->request->input('limit')) ? $this->request->input('limit') : self::DEFAULT_LIMIT;
+    return $this->boundedInt($this->request->input('limit'), self::DEFAULT_LIMIT, 1, $this->maxLimit);
   }
   /**
   * get the offest on records to be returned
@@ -118,7 +133,27 @@ class QueryParser
   */
   public function getPage()
   {
-    return $this->request->input('page') ? $this->request->input('page') : self::DEFAULT_PAGE;
+    return $this->boundedInt($this->request->input('page'), self::DEFAULT_PAGE, 1, PHP_INT_MAX);
+  }
+  /**
+  * Coerce a request value to an int inside [$min, $max].
+  *
+  * Anything non-numeric falls back to $default rather than to PHP's (int) cast,
+  * which turns 'abc' into 0 and pages by nothing.
+  *
+  * @param  mixed $value
+  * @param  int $default
+  * @param  int $min
+  * @param  int $max
+  * @return int
+  */
+  protected function boundedInt($value, $default, $min, $max)
+  {
+    if (!is_numeric($value))
+    {
+      return $default;
+    }
+    return max($min, min($max, (int) $value));
   }
   /**
   * get any specific select params passed

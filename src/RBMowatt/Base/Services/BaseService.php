@@ -2,8 +2,10 @@
 
 namespace RBMowatt\Base\Services;
 
+use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Support\Facades\App;
 use RBMowatt\Base\ErrorCodes;
+use RBMowatt\Base\Services\Exceptions\AmbiguousQueryParamException;
 use RBMowatt\Base\Exceptions\EntityDoesNotExistException;
 use RBMowatt\Base\Models\BaseModel;
 use RBMowatt\Base\Services\ServiceResultsCollection;
@@ -12,9 +14,8 @@ use RBMowatt\Base\Services\Exceptions\InvalidQueryParamException;
 use RBMowatt\Base\Services\Exceptions\InvalidRelationException;
 use RBMowatt\Base\Services\Exceptions\InvalidWhereFormatException;
 use RBMowatt\Base\Services\Exceptions\SortException;
+use RBMowatt\Base\Services\Exceptions\UnboundedResultException;
 use RBMowatt\Base\Services\Interfaces\ServiceInterface;
-use ReflectionClass;
-use ReflectionMethod;
 
 
 
@@ -30,17 +31,44 @@ abstract class BaseService implements ServiceInterface
     */
     protected $scopes = [];
     /*
-    Same idea as $scopes but for sorts. Declared here because getSortScope() reads it
-    on any sort that isn't a real column, and a Service that didn't define it got
-    "Undefined property" instead of the SortException it should have raised.
+    Same idea as $scopes but for sorts. getSortScope() reads it on any sort that is
+    not a real column, so it has to exist even on a Service that declares none.
     */
     protected $sortScopes = [];
+    /*
+    Columns this service will accept as `?column=value` filters. Empty means none.
+
+    Anything listed here is a query oracle for whoever can call the endpoint: the
+    parser turns `?password_hash=>$2y$10$K` into a real where clause, `?count=true`
+    answers it in one cheap integer, and $hidden does not help because it governs
+    serialization, not the query. A hash or a reset token falls to a character-at-a-
+    time binary search from that. List only what callers are meant to filter on.
+    */
+    protected $filterable = [];
+    /*
+    Columns this service will accept in `?sort=`. Empty means none, and the same
+    reasoning applies: ordering by a column the caller cannot otherwise see still
+    leaks where a row sits relative to the others.
+    */
+    protected $sortable = [];
     /*
     By default we will attach the total count of any relations
     This is additional overhead if you don't actually need that meta info
     place any relations you don't need the count for here
     */
     protected $doNotDoCountQueryOn = [];
+    /*
+    How many hops a `?with=` path may take. Each hop is a query and, unless the
+    root is in $doNotDoCountQueryOn, a count query alongside it, so the depth is
+    what a caller multiplies work by. Raise it on a service that genuinely needs
+    a deeper path.
+    */
+    protected $maxRelationDepth = 3;
+    /*
+    The ceiling on all(). Not a page size — the number of rows the service is
+    willing to hand back in one unpaginated read before it refuses.
+    */
+    protected $maxUnpaginated = 500;
     /*
     The default # of results for each GET request
     */
@@ -74,6 +102,22 @@ abstract class BaseService implements ServiceInterface
     public function getScopes()
     {
         return $this->scopes;
+    }
+    /**
+     * Columns callers may filter on
+     * @return array<int, string>
+     */
+    public function getFilterable()
+    {
+        return $this->filterable;
+    }
+    /**
+     * Columns callers may sort by
+     * @return array<int, string>
+     */
+    public function getSortable()
+    {
+        return $this->sortable;
     }
     /**
      * Find A Single Instance based on PK ( assumes `id` )
@@ -117,11 +161,44 @@ abstract class BaseService implements ServiceInterface
         return new ServiceResultsCollection($result);
     }
     /**
+     * Every matching row, for the cases pagination gets in the way of — a dropdown,
+     * an export, a lookup table.
+     *
+     * Bounded rather than unbounded. It reads $maxUnpaginated + 1 rows and throws
+     * if that many come back, so a caller who quietly outgrows the ceiling finds
+     * out instead of shipping a truncated list as if it were complete. The extra
+     * row is why this is one query and not a count followed by a select.
+     *
+     * Filters and sorts go through the same allowlists where() uses.
+     *
+     * @param array<int, mixed> $wheres
+     * @param array<int, mixed> $with
+     * @param array<int, mixed> $sorts
+     * @param array<int, string> $selects
+     * @return ServiceResultsCollection
+     * @throws UnboundedResultException
+     */
+    public function all($wheres = [], array $with = [], $sorts = [], $selects = [])
+    {
+        $model = $this->select($this->primaryModel, $selects);
+        $model = $this->setWheres($model, $wheres);
+        $model = $this->setSorts($model, $sorts);
+        $model = $this->eagerLoad($model, $with);
+
+        $rows = $model->limit($this->maxUnpaginated + 1)->get();
+
+        if ($rows->count() > $this->maxUnpaginated) {
+            throw new UnboundedResultException($this->primaryModel, $this->maxUnpaginated);
+        }
+
+        return new ServiceResultsCollection($rows);
+    }
+    /**
      * The path pagination links are built from, or null when there is no request.
      *
-     * Reads the container's request rather than $_SERVER: outside a web request
-     * $_SERVER has no REQUEST_URI at all, and preg_replace() on that null both
-     * raised a deprecation and handed the paginator a null path.
+     * Reads the container's request, not $_SERVER: outside a web request $_SERVER
+     * carries no REQUEST_URI, and a null path reaches the paginator as broken
+     * next/prev links rather than as an error.
      *
      * @return string|null
      */
@@ -161,9 +238,8 @@ abstract class BaseService implements ServiceInterface
             throw new InvalidArgumentsException('Invalid Arguments');
         }
         $model = App::make(get_class($this->primaryModel));
-        foreach ($params as $prop => $value) {
-            $model->{$prop} = $value;
-        }
+        $this->guardMassAssignment($model, $params);
+        $model->fill($params);
         $model->save();
         if (!empty($callback)) {
              //apply any additional logic provided after we save
@@ -188,15 +264,46 @@ abstract class BaseService implements ServiceInterface
             //there shouldn't be any parameters in the request that don't match up with the record
             throw new InvalidArgumentsException('Invalid Arguments');
         }
-        foreach ($args as $key => $value) {
-            $entity->{$key} = $value;
-        }
+        $this->guardMassAssignment($entity, $args);
+        $entity->fill($args);
         if (!empty($callback)) {
             //apply any additional logic provided before we save
             $callback($entity);
         }
         $entity->save();  
         return $entity;
+    }
+    /**
+     * Reject any key the model's own $fillable/$guarded would not accept.
+     *
+     * fill() on its own is not enough: Eloquent throws only on a totally-guarded
+     * model and otherwise drops the offending key in silence, handing the caller a
+     * saved model that ignored half the payload. Assigning with
+     * $model->{$key} = $value is worse — that is setAttribute(), which carries no
+     * mass-assignment check at all, so a request could write is_admin or a password
+     * column just by naming it.
+     *
+     * @param BaseModel $model
+     * @param array<string, mixed> $params
+     * @return void
+     * @throws MassAssignmentException
+     */
+    protected function guardMassAssignment($model, array $params)
+    {
+        $blocked = array_values(array_filter(
+            array_keys($params),
+            function ($key) use ($model) {
+                return !$model->isFillable($key);
+            }
+        ));
+
+        if ($blocked) {
+            throw new MassAssignmentException(sprintf(
+                'Add [%s] to fillable property to allow mass assignment on [%s].',
+                implode(', ', $blocked),
+                get_class($model)
+            ));
+        }
     }
     /**
      * Delete A Single Instance
@@ -248,7 +355,7 @@ abstract class BaseService implements ServiceInterface
             //will throw exception if sort not valid
             $this->checkValidSort($sort);
 
-            if (!in_array($sort[0], $this->getColumns()) && $scope = $this->getSortScope($sort[0])) {
+            if (!$this->isSortableColumn($sort[0]) && $scope = $this->getSortScope($sort[0])) {
                 //in this case the sort isn't based on a model property
                 //instead it needs to be passed to a scope dedicated to sort
                 $model = $model->{$scope}($sort[0], $sort[1]);
@@ -299,9 +406,22 @@ abstract class BaseService implements ServiceInterface
         }
     }
     /**
+     * Is this sort key a column the service has opened up for sorting?
+     *
+     * A false here sends the key on to getSortScope(), which throws if it is not
+     * a declared sort scope either.
+     *
+     * @param  string $key
+     * @return bool
+     */
+    protected function isSortableColumn($key)
+    {
+        return in_array($key, $this->getSortable(), true) && in_array($key, $this->getColumns());
+    }
+    /**
      * This method determines wheter a sort scope is valid
      * and will return the mapped method name if found
-     * @param  string $key 
+     * @param  string $key
      * @return string
      * @throws SortException
      */
@@ -341,9 +461,7 @@ abstract class BaseService implements ServiceInterface
         $table = $this->primaryModel->getTable();
         $selects = [];
         foreach ($columns as $property) {
-            // an already-qualified column passes through; $c here was an undefined
-            // variable, so a dotted select produced null and three null-argument
-            // deprecations on the way down into the query builder
+            // an already-qualified column passes through untouched
             $selects[] = (stristr($property, '.')) ? $property : implode('.', [$table, $property]);
         }
         if (count($selects)) {
@@ -373,16 +491,19 @@ abstract class BaseService implements ServiceInterface
 
     /**
      * Validate the relations on the model that are being asked for
-     * @param  BaseModel $model 
-     * @param  array $withs 
-     * @return array        
-     */
-    /**
-     * This used to call getMethods() on whatever eagerLoad handed it, which by then
-     * is an Eloquent Builder, not a ReflectionClass. Every ?with= request died on
-     * "Call to undefined method Illuminate\Database\Eloquent\Builder::getMethods()".
-     * It also compared the whole dotted path against method names, so a nested
-     * relation could never match. Only the root has to resolve on the model.
+     *
+     * Every segment of a dotted path is resolved against the model at that level.
+     * Checking only the root and handing the rest to Eloquent's with() would let one
+     * authorized relation walk the whole object graph behind it:
+     * ?with=tokens.account.tokens returns the related account and its tokens to a
+     * caller authorized for nothing but the primary resource. Each hop is also
+     * another query plus a withCount, so an unbounded path multiplies work per
+     * request — hence $maxRelationDepth.
+     *
+     * @param  BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel> $model
+     * @param  array $withs
+     * @return array
+     * @throws InvalidRelationException
      */
     protected function validateRelations($model, $withs)
     {
@@ -391,25 +512,53 @@ abstract class BaseService implements ServiceInterface
         if (!count($withs)) return [];
 
         $primary = $this->primaryModel;
-        $className = get_class($primary);
-        $methodNamesFn = function ($m) use ($className) {
-            return ($m->class == $className) ? $m->name : null;
-        };
-        $methodNames = array_filter(array_map(
-            $methodNamesFn,
-            (new ReflectionClass($primary))->getMethods(ReflectionMethod::IS_PUBLIC)
-        ));
+        $bad = [];
 
-        $roots = array_map(function ($with) {
-            return $this->getRelationRoot((!is_array($with)) ? $with : array_keys($with)[0]);
-        }, array_values($withs));
+        foreach (array_values($withs) as $with) {
+            $path = (!is_array($with)) ? $with : array_keys($with)[0];
+            if (!$this->relationPathResolves($primary, $path)) {
+                $bad[] = $path;
+            }
+        }
 
-        $diff = array_diff($roots, array_values($methodNames));
-        if ($diff) {
+        if ($bad) {
             //we havent found a defined relationship for every relationship requested
-            throw new InvalidRelationException($primary, $diff);
+            throw new InvalidRelationException($primary, $bad);
         }
         return $withs;
+    }
+
+    /**
+     * Walk a dotted relation path, hop by hop, from the primary model.
+     *
+     * @param  BaseModel $model
+     * @param  string $path
+     * @return bool
+     */
+    protected function relationPathResolves($model, $path)
+    {
+        $segments = explode('.', $path);
+
+        if (count($segments) > $this->maxRelationDepth) {
+            return false;
+        }
+
+        $current = $model;
+        foreach ($segments as $segment) {
+            if (!$current instanceof BaseModel) {
+                // a relation pointing at a plain Eloquent model ends the walk: there
+                // is no relationships() on it to check the next hop against
+                return false;
+            }
+            // read the related class out of the map already in hand;
+            // getRelationshipModel() would ask for the whole map a second time
+            $relations = $current->relationships();
+            if (!array_key_exists($segment, $relations)) {
+                return false;
+            }
+            $current = App::make($relations[$segment]['model']);
+        }
+        return true;
     }
 
     /**
@@ -424,17 +573,50 @@ abstract class BaseService implements ServiceInterface
      */
     protected function isScope($key)
     {
-        if (in_array($key, $this->getColumns())) {
+        // A column has to be listed AND real. Requiring both means a typo in
+        // $filterable raises InvalidQueryParamException rather than a QueryException
+        // carrying the statement back to the caller.
+        $isColumn = in_array($key, $this->getColumns());
+        $isAllowlisted = in_array($key, $this->getFilterable(), true);
+
+        if ($isAllowlisted && $isColumn) {
+            // an explicit $filterable entry settles it, even when a scope of the
+            // same name exists
             return false;
         }
+
+        $scopeKey = $this->matchScope($key);
+
+        if ($scopeKey !== null && $isColumn) {
+            // both readings are live and nothing says which was meant
+            throw new AmbiguousQueryParamException($key, $scopeKey);
+        }
+        if ($scopeKey !== null) {
+            return $scopeKey;
+        }
+        throw new InvalidQueryParamException($this, $this->primaryModel, [$key]);
+    }
+
+    /**
+     * The declared scope key this request key maps to, or null.
+     *
+     * A scope may be declared with dots (`widget.type.id`) and arrive with
+     * underscores, since a query string cannot carry the dotted form cleanly.
+     *
+     * @param  string $key
+     * @return string|null
+     */
+    protected function matchScope($key)
+    {
         $scopes = array_keys($this->getScopes());
+
         if (in_array($key, $scopes)) {
             return $key;
         }
-        $k = str_replace('_', '.', $key);
-        if (in_array($k, $scopes)) {
-            return $k;
+        $dotted = str_replace('_', '.', $key);
+        if (in_array($dotted, $scopes)) {
+            return $dotted;
         }
-        throw new InvalidQueryParamException($this, $this->primaryModel, [$key]);
+        return null;
     }
 }

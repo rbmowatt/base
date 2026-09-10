@@ -74,4 +74,7 @@ jobs:
       # to read Laravel's own types, so this is an update rather than an install.
       - run: composer update --no-interaction --no-progress --prefer-dist
 
-      - run: vendor/bin/phpstan analyse --no-progress
+      # setup-php leaves memory_limit at -1, so CI never hit this, but pinning it
+      # here means the job fails the same way a laptop on php's stock 128M would
+      # rather than passing on a runner-only default
+      - run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G

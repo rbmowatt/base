@@ -16,8 +16,9 @@ class Widget extends BaseModel
 }
 
 /**
- * No $table on purpose: Eloquent derives "gadgets", but the $table property stays
- * null, which is what used to collapse every such model onto one cache key.
+ * No $table on purpose: Eloquent derives "gadgets" while the $table property stays
+ * null, so this is the shape that collapses onto a shared cache key if columns() is
+ * keyed on the property instead of getTable().
  */
 class Gadget extends BaseModel
 {

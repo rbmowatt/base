@@ -17,6 +17,8 @@ Requires PHP 8.3 or 8.4 and Laravel 11, 12 or 13.
 
 -  [Controllers](#controllers)
 
+-  [Requests](#requests)
+
 -  [Models](#models)
 
 -  [Usage](#usage)
@@ -28,6 +30,8 @@ Requires PHP 8.3 or 8.4 and Laravel 11, 12 or 13.
 -  [Tests](#tests)
 
 -  [Static Analysis](#static-analysis)
+
+-  [History](#history)
 
 
 ## Install
@@ -63,7 +67,8 @@ class Widget extends BaseModel
 {
     protected $table = 'widgets';
 
-    // Eloquent still guards mass assignment, so a Service create() needs this
+    // A Service create()/update() writes only these. Anything else in the payload
+    // is a MassAssignmentException, not a silently dropped key.
     protected $fillable = ['name', 'type_id'];
 }
 ```
@@ -71,6 +76,13 @@ class Widget extends BaseModel
 ```php
 class WidgetService extends BaseService
 {
+    // columns callers may filter on. Empty means none; a column being real is
+    // not enough on its own
+    protected $filterable = ['name', 'type_id'];
+
+    // columns callers may sort by
+    protected $sortable = ['name', 'type_id'];
+
     // filter params that map to a scope instead of a column
     protected $scopes = ['widget.type.id' => 'byWidgetType'];
 
@@ -203,7 +215,7 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	- Extend [BaseApiContoller.php](src/RBMowatt/Base/Controllers/Api/BaseApiController.php)
 
-	-  **Breaking:** `$this->user` now resolves against `auth.defaults.guard`. It used to hardcode the `api` guard, which Laravel 11 removed from the stock `config/auth.php`, so a fresh app threw `Auth guard [api] is not defined` from the constructor of every subclass. If you were relying on the implicit `api` guard, set it explicitly:
+	-  `$this->user` resolves against `auth.defaults.guard`. Laravel 11 dropped `api` from the stock `config/auth.php`, so pin a guard explicitly if you want one:
 
 		```php
 		protected $guard = 'api';
@@ -212,6 +224,63 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 	- Should **ALWAYS** have their **Dependencies** injected
 
 	- except in the case of needing **CONSTANTS**
+
+### Requests
+
+Validation belongs in a **[BaseFormRequest](src/RBMowatt/Base/Requests/BaseFormRequest.php)**, not in the Controller and not in the Service. A Service is a query surface; the moment it starts checking whether a payload is well-formed it is doing two jobs. Type-hint the request on the action and Laravel validates during injection, before the action body runs.
+
+```php
+class WidgetStoreRequest extends BaseFormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user() !== null;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'type_id' => ['required', 'integer', 'exists:widget_types,id'],
+        ];
+    }
+
+    // runs after the rules pass, so anything needing validated values or a
+    // loaded record goes here rather than in authorize()
+    protected function checkPermissions($validator)
+    {
+        if ($this->input('scope') === 'internal' && !$this->user()->is_admin) {
+            $this->throwPermissionsException('Only an admin can do that.');
+        }
+    }
+}
+```
+
+```php
+public function store(WidgetStoreRequest $request)
+{
+    return $this->response->ok($this->widgetService->create($request->validated()));
+}
+```
+
+Two things worth knowing:
+
+* `validated()` returns only the keys the rules named, so it pairs with the model's `$fillable` as a first gate. A key that passes validation but is not fillable still raises `MassAssignmentException`
+
+* **The Controller's `try/catch` cannot catch these.** Validation and `checkPermissions()` run while Laravel is resolving the request for injection, which is before the action body exists. The host app's exception handler is what renders them, so wire it up:
+
+	```php
+	// bootstrap/app.php
+	->withExceptions(function (Exceptions $exceptions) {
+	    $exceptions->render(function (RBMowatt\Base\Exception $e, $request) {
+	        return ApiResponse::make()->exception($e, 400);
+	    });
+	})
+	```
+
+	`ValidationException` extends `RBMowatt\Base\Exception`, and `ApiResponse::exception()` routes it to `validationError()` for a `422` with the message bag attached.
+
+A worked example lives at [example/Requests/ExampleStoreRequest.php](example/Requests/ExampleStoreRequest.php).
 
 ### Models
 
@@ -223,7 +292,7 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	*  [https://laravel.com/docs/13.x/eloquent](https://laravel.com/docs/13.x/eloquent)
 
-* Set `$fillable` (or `$guarded`) like any Eloquent model, a Service `create()` goes through mass assignment
+* Set `$fillable` (or `$guarded`) like any Eloquent model. A Service `create()` and `update()` check every payload key against it and throw `MassAssignmentException` on the first key the model does not accept — they do not drop it quietly the way `fill()` does. A model that declares neither is totally guarded, which is Eloquent's own default, and will reject everything until you list what is writable
 
 * `softDelete()` delegates to Eloquent, so the model needs `use SoftDeletes;` and a `deleted_at` column. Without the trait it throws rather than writing a column nothing scopes on
 
@@ -233,7 +302,7 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	*  [RelationshipsTrait](src/RBMowatt/Base/Models/Traits/RelationshipsTrait.php)
 
-	*  [PageAndLimitTrait](src/RBMowatt/Base/Models/Traits/PageAndLimitTrait.php)
+	*  [PageAndLimitTrait](src/RBMowatt/Base/Models/Traits/PageAndLimitTrait.php) — `limitTo`, `page` and `pt` build MySQL user-variable SQL through `DB::raw`. The grouping column is checked against the model's real columns and quoted before it goes in, and the group size must be a positive integer, because `setWheres()` will hand a mapped scope whatever the caller sent
 
 	*  [DateCalculationTrait](src/RBMowatt/Base/Models/Traits/DateCalculationTrait.php)
 
@@ -261,13 +330,27 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 *  **OR EQUAL TO** is not covered yet
 
-*  *You can query on any property of the resource/model as exposed or the additional parameters described in the query parameter section of each request*
+*  *You can query on the columns the Service lists in `$filterable`, on any key it maps in `$scopes`, and on nothing else.* An unlisted key is a `400`, whether or not the column exists — the two cases are deliberately indistinguishable so the error cannot be used to walk the schema
+
+	* Accepting any column on the table would make every column an oracle. Combined with the `>` / `<` operators and `?count=true`, `?password_hash=>$2y$10$K` is a valid comparison, the count answers it, and `$hidden` does not help because it governs serialization, not the where clause — a hash or a reset token comes out of that a character at a time
+
+	* `$sortable` is the same list for `?sort=`, kept separate so a column can be orderable without being filterable
+
+	* A scope declared with dots answers to underscores, so `widget.type.id` is reached as `?widget_type_id=`. When a **column of that same name also exists**, the key means two things and the request is rejected with `AmbiguousQueryParamException` rather than silently taking the scope. List the column in `$filterable` to make it win, or rename the scope. Sorting is unaffected — `$sortScopes` keys are matched exactly, with no underscore-to-dot step
 
 *  **WITH** Returns relations and can be passed in one of 2 ways
 
 	*  `?with=[relation1,relation2]`
 
 	*  `?with[]=relation1&with[]=relation2`
+
+	* Nested paths work — `?with=parts.supplier` — and **every segment** is resolved against the model at that level. Checking only the root would let one authorized relation expose everything reachable behind it
+
+	* Paths are capped at `$maxRelationDepth` hops (default 3) because each hop is a query plus a count
+
+	* The relation map each hop is checked against is cached per model class for 24h, the same as `columns()`. Discovery reflects the class and builds a relation object for every relation method on it to read the related class, which is far too much to repeat per request. Add or rename a relation and clear the cache on deploy
+
+	* A relation you declare is a relation callers can pull. Use `$hidden` on the related model for fields that should not travel with it
 
 
 
@@ -279,9 +362,15 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	*  **DEFAULT** set is always **20**
 
+	* `limit` is clamped to `QueryParser::MAX_LIMIT` (100) and coerced to an int. Unclamped it reaches `paginate()` verbatim, where `?limit=1000000` is a single-request table dump and `?limit=abc` arrives as a string. Subclass `QueryParser` and raise `$maxLimit` for an endpoint that needs bigger pages
+
+	* A non-numeric `limit` or `page` falls back to the default rather than casting to `0`
+
+	* For the cases pagination gets in the way of — a dropdown, an export — a Service has `all()`, which returns a `ServiceResultsCollection` with no pagination metadata. It is bounded: more than `$maxUnpaginated` matching rows (default 500) throws `UnboundedResultException` rather than handing back a truncated list that looks complete. Filters and sorts go through the same allowlists
+
 *  **SORT**
 
-	* Sort the results asc or desc based on an exposed resource property
+	* Sort the results asc or desc based on a column listed in the Service's `$sortable`, or a key mapped in `$sortScopes`
 
 	*  **Sort** key pattern = `{property}_{order (ASC|DESC)}`
 
@@ -362,28 +451,6 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 ### APIResponse
 
-#### Breaking changes to the envelope
-
-If you are upgrading an app that already consumes this package, three things changed:
-
-*  `success` is now always a real boolean. The error path used to emit the **string** `"true"` on success and the boolean `false` on failure, so a client doing a strict comparison saw two different types depending on the outcome.
-
-*  Values are no longer coerced by `JSON_NUMERIC_CHECK`. Any numeric-looking string in the payload used to be rewritten on the way out: `"07005"` shipped as `7005`, `"000123"` as `123`, `"1.10"` as `1.1`, and an id past `2^53` came back as a number a JavaScript client cannot parse without losing the last digits. Strings now ship as strings. If a client relied on receiving numbers, cast on the client.
-
-*  `error()` defaults to a `400` status instead of `200`. Pass the status explicitly if you want something else. `exception()` still defaults to `500` and `validationError()` to `422`.
-
-*  `BaseApiController::__construct()` type-hints `ApiResponseInterface` instead of `ApiResponse`. Passing an `ApiResponse` still works. The service provider binds the interface to `ApiResponse`, so subclasses keep resolving out of the container.
-
-*  `ServiceResultsCollection::__construct()` no longer takes a model as its first argument. It never used one. Pass only the results.
-
-*  `href` comes from the container's request instead of `$_SERVER['REQUEST_URI']`, and is `null` rather than the string `N/A` when no request is bound. `$_SERVER` is process-global, so on a long-lived worker it holds whatever the process started with rather than the request being answered.
-
-*  `time` is now ISO 8601 with an offset (`2026-09-09T10:15:00-07:00`). It used to be `date('y-m-d H:i:s')` — a two-digit year and no timezone, so `26-09-09 10:15:00` was ambiguous to anything parsing it.
-
-*  No CORS headers are sent. The package used to add `Access-Control-Allow-Origin: *` to every response, which overrode whatever the app's `HandleCors` middleware configured.
-
-*  `version` reads `config('app.version')`. It used to come from a global `getVersion()` helper the package autoloaded, which read a `.app.info.php` file at the project root. That helper and the rest of the package's global helpers are gone.
-
 An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standardized format and include the following properties
 
 *  `success`
@@ -426,6 +493,10 @@ An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standard
 
 	* IF error exists, human readable message
 
+	* With `app.debug` off, only exceptions extending `RBMowatt\Base\Exception` are echoed back — those messages are written for the caller. Anything else renders as `ApiResponse::REDACTED_MESSAGE` and the real exception goes to the log. `QueryException` is why: its message carries the executed SQL with bindings already interpolated, so an unredacted envelope let a client enumerate the schema a column name at a time and read row data out of a failed write. Correlate a redacted body with its log line using `responseId`
+
+	* With `app.debug` on, the message is followed by `FILE::` and `LINE::` as before. Do not run production with debug on
+
 *  `errorCode`
 
 	*  **[Error Code](src/RBMowatt/Base/ErrorCodes.php)** Associated With message
@@ -439,6 +510,14 @@ An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standard
 	* displays the version of the api the request is being run against
 
 	* read from `config('app.version')`, which Laravel does not set for you. Add it to `config/app.php` or the field reports `undefined`
+
+### Status codes and types
+
+*  `ok()` returns `200` unless you pass another code. `error()` returns `400`, `exception()` `500`, and `validationError()` `422`
+
+*  `success` is a real boolean, never a string, so a strict comparison on the client is safe
+
+*  Payload values are not coerced. `JSON_NUMERIC_CHECK` is deliberately off, so `"07005"` stays `"07005"`, `"1.10"` stays `"1.10"`, and an id past `2^53` stays a string a JavaScript client can read without losing digits. Cast on the client if you need numbers
 
 ### Swapping the implementation
 
@@ -468,8 +547,18 @@ CI runs the same suite across PHP 8.3 and 8.4 against Laravel 11, 12 and 13 for 
 ## Static analysis
 
 ```
-vendor/bin/phpstan analyse
+composer analyse
 ```
 
 PHPStan runs at level 5 over `src`, with larastan supplying Laravel's own types so Eloquent's magic calls resolve. It runs as its own CI job and is expected to stay at zero errors.
 
+The composer script passes `--memory-limit=1G`. Larastan resolves the whole framework to read Eloquent's types and needs well past PHP's stock 128M, so `vendor/bin/phpstan analyse` on a default CLI config dies with "PHPStan process crashed because it reached configured PHP memory limit" from a parallel worker. CI never saw it because `setup-php` leaves `memory_limit` at `-1`.
+
+
+## History
+
+First committed June 2020. Modernized in 2026 for Laravel 11, 12 and 13 on PHP 8.3+.
+
+```
+git log --reverse
+```

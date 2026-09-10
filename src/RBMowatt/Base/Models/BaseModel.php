@@ -52,10 +52,10 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
   */
   public function columns()
   {
-    // Keyed off getTable(), not the $table property: the property is null on any
-    // model that lets Eloquent derive its table name, so every one of them shared
-    // the key '_tbl' and served each other's column lists. The TTL is seconds
-    // (Laravel 5.8 changed it from minutes), so 60 * 24 was 24 minutes, not a day.
+    // Keyed off getTable(), not the $table property: that property is null on any
+    // model that lets Eloquent derive its table name, so keying on it would make
+    // every such model share one entry and serve each other's column lists. The TTL
+    // argument is in seconds, so this is 24 hours.
     return Cache::remember('rbmowatt_base_columns_' . $this->getTable(), 60 * 60 * 24, function () {
       return Schema::getColumnListing($this->getTable());
     });
@@ -67,9 +67,9 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
   */
   public function validate( array $args)
   {
-    // This was `!array_intersect(...) == $args`, and `!` binds tighter than `==`,
-    // so it compared a bool to the payload. A payload holding one real column plus
-    // any number of junk keys came out valid.
+    // array_diff, not array_intersect compared against $args: the question is which
+    // keys are NOT columns, and an intersect comparison lets a payload carrying one
+    // real column plus any amount of junk pass.
     if($extraneous = array_diff(array_keys($args), $this->columns()))
     {
       throw new ExtraneousDataException('Invalid Arguments: ' . implode(', ', $extraneous));

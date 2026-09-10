@@ -18,8 +18,8 @@ class ServiceResultsCollection
         //Query Bulider will return plain objects on raw queries
         if(!is_object($results))
         {
-            // method_exists() is a TypeError on an array in PHP 8, which made the
-            // raw-data branch below unreachable for the one input type it names.
+            // handled before the method_exists() checks below: those are a TypeError
+            // on an array in PHP 8, so an array never reaches the raw-data branch
             $this->items = $results;
             return;
         }
