@@ -9,5 +9,5 @@ interface ApiResponseInterface
 
     public function exception(\Exception $e, $code = 500);
 
-    public function validationFails(\Validator $validator);
+    public function validationFails(\Illuminate\Validation\Validator $validator);
 }

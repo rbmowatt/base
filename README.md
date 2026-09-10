@@ -370,6 +370,10 @@ If you are upgrading an app that already consumes this package, three things cha
 
 *  `error()` defaults to a `400` status instead of `200`. Pass the status explicitly if you want something else. `exception()` still defaults to `500` and `validationError()` to `422`.
 
+*  `ServiceResultsCollection::__construct()` no longer takes a model as its first argument. It never used one. Pass only the results.
+
+*  `href` comes from the container's request instead of `$_SERVER['REQUEST_URI']`, and is `null` rather than the string `N/A` when no request is bound. `$_SERVER` is process-global, so on a long-lived worker it holds whatever the process started with rather than the request being answered.
+
 *  `time` is now ISO 8601 with an offset (`2026-09-09T10:15:00-07:00`). It used to be `date('y-m-d H:i:s')` — a two-digit year and no timezone, so `26-09-09 10:15:00` was ambiguous to anything parsing it.
 
 *  No CORS headers are sent. The package used to add `Access-Control-Allow-Origin: *` to every response, which overrode whatever the app's `HandleCors` middleware configured.
@@ -384,7 +388,7 @@ An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standard
 
 *  `href`
 
-	* indicates endpoint
+	* request URI this response answers, taken from the framework's request. `null` when no request is bound
 
 *  `app`
 
@@ -439,9 +443,19 @@ An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standard
 ## Tests
 
 ```
-composer install
+composer update
 vendor/bin/phpunit
 ```
 
+`composer.lock` is not committed, so use `composer update` rather than `composer install`.
+
 CI runs the same suite across PHP 8.3 and 8.4 against Laravel 11, 12 and 13 for every push and pull request. The framework version is pinned through testbench: 9 pulls Laravel 11, 10 pulls 12, 11 pulls 13.
+
+## Static analysis
+
+```
+vendor/bin/phpstan analyse
+```
+
+PHPStan runs at level 5 over `src`, with larastan supplying Laravel's own types so Eloquent's magic calls resolve. It runs as its own CI job and is expected to stay at zero errors.
 

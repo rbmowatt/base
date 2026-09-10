@@ -34,10 +34,10 @@ trait Mockery
     {
         if($data instanceof LengthAwarePaginator)
         {
-            return new ServiceResultsCollection($data, $data);
+            return new ServiceResultsCollection($data);
         }
         $data = is_array($data) ? $data : [$data];
-        return new ServiceResultsCollection($data, new LengthAwarePaginator($data, $count, $limit, $page));
+        return new ServiceResultsCollection(new LengthAwarePaginator($data, $count, $limit, $page));
     }
     /**
     * Set The Attribute Handlers On A Mock

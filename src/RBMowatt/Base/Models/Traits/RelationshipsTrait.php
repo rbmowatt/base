@@ -19,7 +19,7 @@ trait RelationshipsTrait
      * Note: a relation method with no return type is not found, and ?with= will reject it as an unknown relation.
      */
     public function relationships() {
-        $model = new static;
+        $model = $this->newInstance();
         foreach((new ReflectionClass($model))->getMethods(ReflectionMethod::IS_PUBLIC) as $method)
         {
             if ($method->class != get_class($model) || !$this->declaresARelation($method)) {

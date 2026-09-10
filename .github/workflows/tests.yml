@@ -51,3 +51,27 @@ jobs:
       - run: composer update --no-interaction --no-progress --prefer-dist
 
       - run: vendor/bin/phpunit
+
+  static-analysis:
+    name: phpstan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-phpstan-${{ hashFiles('composer.json') }}
+          restore-keys: composer-phpstan-
+
+      # No lock file to install from, and larastan needs the framework resolved
+      # to read Laravel's own types, so this is an update rather than an install.
+      - run: composer update --no-interaction --no-progress --prefer-dist
+
+      - run: vendor/bin/phpstan analyse --no-progress

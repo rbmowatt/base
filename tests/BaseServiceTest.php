@@ -131,6 +131,22 @@ class BaseServiceTest extends TestCase
         $this->assertStringNotContainsString('limit', $aggregates[0]);
     }
 
+    /**
+     * select() used to read getTable() off whatever eagerLoad() returned. With any
+     * relation requested that is a Builder, which forwards unknown calls to the
+     * query builder, so asking for relations and selects together was a
+     * BadMethodCallException.
+     */
+    public function testFindTakesRelationsAndSelectsTogether(): void
+    {
+        $gizmo = Gizmo::first();
+
+        $found = $this->service()->find($gizmo->id, ['parts'], ['id', 'name']);
+
+        $this->assertSame(['id', 'name', 'parts'], array_keys($found->toArray()));
+        $this->assertCount(2, $found->parts);
+    }
+
     public function testBareSelectsAreQualifiedWithTheTable(): void
     {
         $results = $this->withoutPhpErrors(fn () => $this->service()->where([], [], [], ['name']));

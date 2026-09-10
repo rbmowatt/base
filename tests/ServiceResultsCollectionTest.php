@@ -10,7 +10,7 @@ class ServiceResultsCollectionTest extends TestCase
 {
     public function testAcceptsRawArrayResults(): void
     {
-        $results = new ServiceResultsCollection(null, ['a', 'b']);
+        $results = new ServiceResultsCollection(['a', 'b']);
 
         $this->assertSame(['a', 'b'], $results->items());
         $this->assertSame(2, $results->count());
@@ -21,7 +21,7 @@ class ServiceResultsCollectionTest extends TestCase
     {
         $paginator = new LengthAwarePaginator(['a', 'b'], 10, 2, 1);
 
-        $results = new ServiceResultsCollection(null, $paginator);
+        $results = new ServiceResultsCollection($paginator);
 
         $this->assertSame(10, $results->getMeta('total'));
         $this->assertSame(2, $results->getMeta('per_page'));
@@ -30,7 +30,7 @@ class ServiceResultsCollectionTest extends TestCase
 
     public function testAcceptsACollection(): void
     {
-        $results = new ServiceResultsCollection(null, new Collection(['a']));
+        $results = new ServiceResultsCollection(new Collection(['a']));
 
         $this->assertSame(1, $results->count());
         $this->assertSame([], $results->getMeta());
@@ -45,7 +45,7 @@ class ServiceResultsCollectionTest extends TestCase
         });
 
         try {
-            new ServiceResultsCollection(null, new Collection(['a']));
+            new ServiceResultsCollection(new Collection(['a']));
         } finally {
             restore_error_handler();
         }

@@ -5,6 +5,7 @@ namespace RBMowatt\Base\Services;
 use Illuminate\Support\Facades\App;
 use RBMowatt\Base\ErrorCodes;
 use RBMowatt\Base\Exceptions\EntityDoesNotExistException;
+use RBMowatt\Base\Models\BaseModel;
 use RBMowatt\Base\Services\ServiceResultsCollection;
 use RBMowatt\Base\Services\Exceptions\InvalidArgumentsException;
 use RBMowatt\Base\Services\Exceptions\InvalidQueryParamException;
@@ -90,12 +91,13 @@ abstract class BaseService implements ServiceInterface
     }
     /**
      * Find with filters other than uid
-     * @param  array $wheres A list of filters generally synonymous with SQL "where"
-     * @param array $with A list of relations that will map to QueryBuilders "with" method
-     * @param array $sorts A list of Sort Orders That will be applies in the order recieved
+     * @param  array<int, mixed>|int|string $wheres A list of filters generally synonymous with SQL "where", or a primary key, which is routed to find()
+     * @param array<int, mixed> $with A list of relations that will map to QueryBuilders "with" method
+     * @param array<int, mixed> $sorts A list of Sort Orders That will be applies in the order recieved
+     * @param array<int, string> $selects
      * @param int $limit How many records to limit the result to
      * @param int $page What page are we on in a pagination context ?
-     * @return ServiceResultsCollection  A beefed up vesrion of Laravels Default Collection
+     * @return ServiceResultsCollection|BaseModel|null A beefed up vesrion of Laravels Default Collection, or the single model when $wheres is a key
      */
     public function where($wheres, array $with = [], $sorts = [], $selects = [], $limit = self::DEFAULT_LIMIT, $page = self::DEFAULT_PAGE)
     {
@@ -106,16 +108,32 @@ abstract class BaseService implements ServiceInterface
         $model = $this->setWheres($model, $wheres);
         $model = $this->setSorts($model, $sorts);
         $model = $this->eagerLoad($model, $with);
-        $result = $model->paginate($limit)->withPath(preg_replace('/&page=\d*/', '', $_SERVER['REQUEST_URI']));
+        $result = $model->paginate($limit);
+        if ($path = $this->paginationPath())
+        {
+            $result = $result->withPath($path);
+        }
         //we're going to wrap this is a ServiceResultsCollection to add some functionality to make things easier for the consumer to parse
-        return new ServiceResultsCollection($this->primaryModel, $result);
+        return new ServiceResultsCollection($result);
     }
-    /** 
-    * Create an instance based on provided params
-    * @param array $params an array of key values to be applied to the entity
-    * @param mixed $callback provide a function to be caled AFTER entity saves
-    * @return BaseModel
-    */
+    /**
+     * The path pagination links are built from, or null when there is no request.
+     *
+     * Reads the container's request rather than $_SERVER: outside a web request
+     * $_SERVER has no REQUEST_URI at all, and preg_replace() on that null both
+     * raised a deprecation and handed the paginator a null path.
+     *
+     * @return string|null
+     */
+    protected function paginationPath()
+    {
+        if (!App::bound('request'))
+        {
+            return null;
+        }
+
+        return preg_replace('/&page=\d*/', '', App::make('request')->getRequestUri());
+    }
     /**
      * Count the rows matching a set of where clauses.
      *
@@ -132,7 +150,7 @@ abstract class BaseService implements ServiceInterface
     }
     /**
     * Create an instance based on provided params
-    * @param array $params an array of key values to be applied to the entity
+    * @param array<string, mixed>|mixed $params an array of key values to be applied to the entity
     * @param mixed $callback provide a function to be caled AFTER entity saves
     * @return BaseModel
     */
@@ -191,9 +209,9 @@ abstract class BaseService implements ServiceInterface
     }
     /**
      * Set the filters on query
-     * @param BaseModel $model  
-     * @param array $wheres 
-     * @return BaseModel
+     * @param BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel> $model
+     * @param array<int, mixed> $wheres
+     * @return BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel>
      */
     protected function setWheres($model, $wheres)
     {
@@ -220,9 +238,9 @@ abstract class BaseService implements ServiceInterface
     }
     /**
      * Set the sort options on the query
-     * @param BaseModel $model
-     * @param array $sorts
-     * @return BaseModel
+     * @param BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel> $model
+     * @param array<int, mixed> $sorts
+     * @return BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel>
      */
     public function setSorts($model, $sorts)
     {
@@ -245,9 +263,9 @@ abstract class BaseService implements ServiceInterface
 
     /**
      * Attach Any Eager Loading relations
-     * @param Object $model an instance of the model upon which to attach the withs
-     * @param array $withs an array of relations
-     * @return Object
+     * @param BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel> $model an instance of the model upon which to attach the withs
+     * @param array<int, mixed> $withs an array of relations
+     * @return BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel>
      */
     protected function eagerLoad($model, $withs)
     {
@@ -270,7 +288,7 @@ abstract class BaseService implements ServiceInterface
     }
     /**
      * Confirms Entity Exists and throws exception if not
-     * @return null
+     * @return void
      * @throws EntityDoesNotExistException
      */
     public function confirmExistence($ids)
@@ -310,31 +328,35 @@ abstract class BaseService implements ServiceInterface
 
     /**
      * Add Select Clauses To Query
-     * @param  BaseModel $model   
-     * @param  string $columns 
-     * @return BaseModel         
+     *
+     * @param  BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel> $model
+     * @param  array<int, string> $columns
+     * @return \Illuminate\Database\Eloquent\Builder<BaseModel>
      */
     protected function select($model, $columns)
     {
+        // The table name comes off the service's own model: by the time eagerLoad()
+        // has run, $model is a Builder, and a Builder forwards unknown calls to the
+        // query builder, which has no getTable().
+        $table = $this->primaryModel->getTable();
         $selects = [];
         foreach ($columns as $property) {
             // an already-qualified column passes through; $c here was an undefined
             // variable, so a dotted select produced null and three null-argument
             // deprecations on the way down into the query builder
-            $selects[] = (stristr($property, '.')) ? $property : implode('.', [$model->getTable(), $property]);
+            $selects[] = (stristr($property, '.')) ? $property : implode('.', [$table, $property]);
         }
         if (count($selects)) {
             //selects were added to append them to query and move on
             return $model->select($selects);
         }
         //here we will namespace the table to avoid collisons or getting data from other joined tables
-        return (method_exists($model, 'getTable')) ?
-            $model->select(implode('.', [$model->getTable(), '*'])) : $model;
+        return $model->select(implode('.', [$table, '*']));
     }
 
     /**
      * get $this->primaryModel's columns
-     * @return [array] [an array of $this->primaryModel's columns]
+     * @return array<int, string>
      */
     public function getColumns()
     {
@@ -391,9 +413,13 @@ abstract class BaseService implements ServiceInterface
     }
 
     /**
-     * Chexks to see if a parameter in the request is a model property or scope
-     * @param  string  $key 
-     * @return boolean
+     * Checks to see if a parameter in the request is a model property or scope
+     *
+     * Returns the scope key to call, or false when $key is a real column. Callers
+     * rely on the returned key, so this is not a plain boolean.
+     *
+     * @param  string  $key
+     * @return string|false
      * @throws InvalidQueryParamException
      */
     protected function isScope($key)

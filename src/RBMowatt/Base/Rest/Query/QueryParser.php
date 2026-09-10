@@ -79,11 +79,12 @@ class QueryParser
     return $sorts;
   }
   /**
-  * Takes post data and turnns any comma delmited or special strings into values we can use
-  * @param  they key to get the values from $requestKey [description]
-  * @param  string $modelKey   [description]
-  * @param  array  $filtered   [description]
-  * @return [type]             [description]
+  * Takes post data and turns any comma delimited or special strings into values we can use
+  *
+  * @param  string $requestKey the request key to read the values from
+  * @param  string $modelKey
+  * @param  array<int, mixed>  $filtered
+  * @return array<int, mixed>
   */
   public function filterPost($requestKey, $modelKey = 'id', $filtered = [])
   {
@@ -138,8 +139,7 @@ class QueryParser
     return is_array($f = $this->request->input('with')) ? $f : $this->convertToArray($f);
   }
   /**
-  * [getWheres description]
-  * @return [type] [description]
+  * @return array<int, mixed>
   */
   public function getWheres($customWheres=[], $without=[], $type = 'filter')
   {
@@ -171,8 +171,9 @@ class QueryParser
   /**
   * Will take the pk off a delete request and break it into an array
   * ex DELETE /sample/[1,2,3] becomes Array(1,2,3)
-  * @param  [type] $key [description]
-  * @return [type]      [description]
+  *
+  * @param  string|int $key
+  * @return array<int, mixed>
   */
   public function parseAttach($key)
   {

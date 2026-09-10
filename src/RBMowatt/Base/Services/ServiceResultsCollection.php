@@ -11,7 +11,7 @@ class ServiceResultsCollection
 
     protected $results;
 
-    public function __construct($model, $results)
+    public function __construct($results)
     {
         $this->results = $results;
         //first we have to figure out what method we need to call to get our base collection
@@ -40,7 +40,8 @@ class ServiceResultsCollection
     }
     /**
     * Provides all the metainfo about the result particularly pagination
-    * @return [type] [description]
+    *
+    * @param string|null $property one meta key, or null for the whole array
     */
     public function getMeta($property = null)
     {
@@ -60,10 +61,6 @@ class ServiceResultsCollection
             return [];
         }
     }
-    /**
-    * [items description]
-    * @return [type] [description]
-    */
     public function items()
     {
         return $this->items;
@@ -77,7 +74,7 @@ class ServiceResultsCollection
     }
     /**
      * transform items as needed
-     * @param function $fn
+     * @param callable $fn
      */
     public function transform($fn)
     {

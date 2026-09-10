@@ -31,17 +31,14 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
 
   /**
   * Overrides laravel default and sets base collection as collection object returned
-  * @param  array  $models [description]
-  * @return BaseCollection  [description]
+  *
+  * @param  array<int|string, static>  $models
+  * @return BaseCollection<int|string, static>
   */
   public function newCollection(array $models = [])
   {
     return new BaseCollection($models);
   }
-  /**
-  * [jsonSerialize description]
-  * @return [type] [description]
-  */
   public function jsonSerialize(): mixed {
     return $this->toArray();
   }
@@ -51,8 +48,7 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
     return trim($sign) == self::NOT_EQUALS;
   }
   /**
-  * [columns description]
-  * @return [type] [description]
+  * @return array<int, string>
   */
   public function columns()
   {
@@ -65,9 +61,9 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
     });
   }
   /**
-  * [validate description]
-  * @param  array  $args [description]
-  * @return [type]       [description]
+  * @param  array<string, mixed>  $args
+  * @return true
+  * @throws ExtraneousDataException
   */
   public function validate( array $args)
   {
@@ -82,9 +78,9 @@ class BaseModel extends Model implements BaseModelInterface,  JsonSerializable
   }
   /**
   * This will take an array and return an array with only keys that match columns
-  * 
-  * @param  array  $args [description]
-  * @return [type]       [description]
+  *
+  * @param  array<string, mixed>  $args
+  * @return array<string, mixed>
   */
   public function filter(array $args)
   {
