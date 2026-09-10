@@ -14,8 +14,6 @@ use RBMowatt\Base\Services\Exceptions\InvalidRelationException;
 use RBMowatt\Base\Services\Exceptions\InvalidWhereFormatException;
 use RBMowatt\Base\Services\Exceptions\SortException;
 use RBMowatt\Base\Services\Interfaces\ServiceInterface;
-use ReflectionClass;
-use ReflectionMethod;
 
 
 
@@ -58,6 +56,13 @@ abstract class BaseService implements ServiceInterface
     place any relations you don't need the count for here
     */
     protected $doNotDoCountQueryOn = [];
+    /*
+    How many hops a `?with=` path may take. Each hop is a query and, unless the
+    root is in $doNotDoCountQueryOn, a count query alongside it, so the depth is
+    what a caller multiplies work by. Raise it on a service that genuinely needs
+    a deeper path.
+    */
+    protected $maxRelationDepth = 3;
     /*
     The default # of results for each GET request
     */
@@ -450,16 +455,19 @@ abstract class BaseService implements ServiceInterface
 
     /**
      * Validate the relations on the model that are being asked for
-     * @param  BaseModel $model 
-     * @param  array $withs 
-     * @return array        
-     */
-    /**
-     * This used to call getMethods() on whatever eagerLoad handed it, which by then
-     * is an Eloquent Builder, not a ReflectionClass. Every ?with= request died on
-     * "Call to undefined method Illuminate\Database\Eloquent\Builder::getMethods()".
-     * It also compared the whole dotted path against method names, so a nested
-     * relation could never match. Only the root has to resolve on the model.
+     *
+     * Every segment of a dotted path is resolved against the model at that level.
+     * This used to check only the root and hand the rest of the path straight to
+     * Eloquent's with(), so one authorized root relation walked the whole object
+     * graph behind it: ?with=tokens.account.tokens returned the related account
+     * and its tokens to a caller authorized for nothing but the primary resource.
+     * Each hop is also another query plus a withCount, so an unbounded path is a
+     * cheap way to multiply work per request — hence $maxRelationDepth.
+     *
+     * @param  BaseModel|\Illuminate\Database\Eloquent\Builder<BaseModel> $model
+     * @param  array $withs
+     * @return array
+     * @throws InvalidRelationException
      */
     protected function validateRelations($model, $withs)
     {
@@ -468,25 +476,50 @@ abstract class BaseService implements ServiceInterface
         if (!count($withs)) return [];
 
         $primary = $this->primaryModel;
-        $className = get_class($primary);
-        $methodNamesFn = function ($m) use ($className) {
-            return ($m->class == $className) ? $m->name : null;
-        };
-        $methodNames = array_filter(array_map(
-            $methodNamesFn,
-            (new ReflectionClass($primary))->getMethods(ReflectionMethod::IS_PUBLIC)
-        ));
+        $bad = [];
 
-        $roots = array_map(function ($with) {
-            return $this->getRelationRoot((!is_array($with)) ? $with : array_keys($with)[0]);
-        }, array_values($withs));
+        foreach (array_values($withs) as $with) {
+            $path = (!is_array($with)) ? $with : array_keys($with)[0];
+            if (!$this->relationPathResolves($primary, $path)) {
+                $bad[] = $path;
+            }
+        }
 
-        $diff = array_diff($roots, array_values($methodNames));
-        if ($diff) {
+        if ($bad) {
             //we havent found a defined relationship for every relationship requested
-            throw new InvalidRelationException($primary, $diff);
+            throw new InvalidRelationException($primary, $bad);
         }
         return $withs;
+    }
+
+    /**
+     * Walk a dotted relation path, hop by hop, from the primary model.
+     *
+     * @param  BaseModel $model
+     * @param  string $path
+     * @return bool
+     */
+    protected function relationPathResolves($model, $path)
+    {
+        $segments = explode('.', $path);
+
+        if (count($segments) > $this->maxRelationDepth) {
+            return false;
+        }
+
+        $current = $model;
+        foreach ($segments as $segment) {
+            if (!$current instanceof BaseModel) {
+                // a relation pointing at a plain Eloquent model ends the walk: there
+                // is no relationships() on it to check the next hop against
+                return false;
+            }
+            if (!array_key_exists($segment, $current->relationships())) {
+                return false;
+            }
+            $current = $current->getRelationshipModel($segment);
+        }
+        return true;
     }
 
     /**

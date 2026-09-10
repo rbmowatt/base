@@ -281,6 +281,12 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	*  `?with[]=relation1&with[]=relation2`
 
+	* Nested paths work — `?with=parts.supplier` — and **every segment** is resolved against the model at that level. Only the root used to be checked, which meant one authorized relation exposed everything reachable behind it
+
+	* Paths are capped at `$maxRelationDepth` hops (default 3) because each hop is a query plus a count
+
+	* A relation you declare is a relation callers can pull. Use `$hidden` on the related model for fields that should not travel with it
+
 
 
 *  **PAGINATION**
