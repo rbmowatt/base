@@ -9,6 +9,8 @@ Requires PHP 8.3 or 8.4 and Laravel 11, 12 or 13.
 ## Contents
 -  [Install](#install)
 
+-  [Upgrading to 0.3](#upgrading-to-03)
+
 -  [What It Does](#what-it-does)
 
 -  [Architecture](#architecture)
@@ -45,6 +47,31 @@ composer require rbmowatt/base:dev-master
 ```
 
 The service provider is picked up by package discovery, so there is nothing to add to your config.
+
+## Upgrading to 0.3
+
+0.3 closes a set of holes where the package's default was "allow". Every one of
+them is a breaking change, and the breakage is deliberate — an app that upgrades
+without touching anything will start refusing requests it used to serve, rather
+than quietly keeping a hole open.
+
+* **Filtering is allowlisted.** Add `$filterable` to every Service, listing the columns callers may filter on. An empty list filters nothing. Previously any column on the table was a valid filter, which — with the `>` / `<` operators and `?count=true` — made every column a comparison oracle a password hash or reset token could be walked out of, `$hidden` notwithstanding
+
+* **Sorting is allowlisted.** Same, via `$sortable`
+
+* **`create()` and `update()` honor `$fillable`.** They assigned attributes directly before, so `$fillable` did nothing and any real column was writable straight off the request. A key the model does not accept is now a `MassAssignmentException`. A model that declares neither `$fillable` nor `$guarded` is totally guarded, which is Eloquent's own default
+
+* **`?with=` validates every segment of a dotted path**, not just the root, and is capped at `$maxRelationDepth` hops
+
+* **`limit` is clamped** to `QueryParser::MAX_LIMIT` (100) and cast to an int
+
+* **Error bodies are redacted with `app.debug` off** unless the exception extends `RBMowatt\Base\Exception`. `QueryException` messages carry the executed SQL with bindings, so they were handing out the schema and row data
+
+* **The paging scopes validate their grouping column** against the model's real columns instead of interpolating it into `DB::raw`
+
+The fastest migration is to add `$filterable` and `$sortable` to each Service with
+the columns your clients already send, then run your integration tests and add
+whatever comes back as a `400`.
 
 ## What It Does
 
