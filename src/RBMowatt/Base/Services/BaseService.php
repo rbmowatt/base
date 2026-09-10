@@ -5,6 +5,7 @@ namespace RBMowatt\Base\Services;
 use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Support\Facades\App;
 use RBMowatt\Base\ErrorCodes;
+use RBMowatt\Base\Services\Exceptions\AmbiguousQueryParamException;
 use RBMowatt\Base\Exceptions\EntityDoesNotExistException;
 use RBMowatt\Base\Models\BaseModel;
 use RBMowatt\Base\Services\ServiceResultsCollection;
@@ -579,17 +580,47 @@ abstract class BaseService implements ServiceInterface
         // A column has to be listed AND real. Requiring both means a typo in
         // $filterable is an InvalidQueryParamException rather than a QueryException
         // carrying the statement back to the caller.
-        if (in_array($key, $this->getFilterable(), true) && in_array($key, $this->getColumns())) {
+        $isColumn = in_array($key, $this->getColumns());
+        $isAllowlisted = in_array($key, $this->getFilterable(), true);
+
+        if ($isAllowlisted && $isColumn) {
+            // an explicit $filterable entry settles it, even when a scope of the
+            // same name exists
             return false;
         }
+
+        $scopeKey = $this->matchScope($key);
+
+        if ($scopeKey !== null && $isColumn) {
+            // both readings are live and nothing says which was meant
+            throw new AmbiguousQueryParamException($key, $scopeKey);
+        }
+        if ($scopeKey !== null) {
+            return $scopeKey;
+        }
+        throw new InvalidQueryParamException($this, $this->primaryModel, [$key]);
+    }
+
+    /**
+     * The declared scope key this request key maps to, or null.
+     *
+     * A scope may be declared with dots (`widget.type.id`) and arrive with
+     * underscores, since a query string cannot carry the dotted form cleanly.
+     *
+     * @param  string $key
+     * @return string|null
+     */
+    protected function matchScope($key)
+    {
         $scopes = array_keys($this->getScopes());
+
         if (in_array($key, $scopes)) {
             return $key;
         }
-        $k = str_replace('_', '.', $key);
-        if (in_array($k, $scopes)) {
-            return $k;
+        $dotted = str_replace('_', '.', $key);
+        if (in_array($dotted, $scopes)) {
+            return $dotted;
         }
-        throw new InvalidQueryParamException($this, $this->primaryModel, [$key]);
+        return null;
     }
 }

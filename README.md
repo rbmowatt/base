@@ -361,6 +361,8 @@ A worked example lives at [example/Requests/ExampleStoreRequest.php](example/Req
 
 	* `$sortable` is the same list for `?sort=`, kept separate so a column can be orderable without being filterable
 
+	* A scope declared with dots answers to underscores, so `widget.type.id` is reached as `?widget_type_id=`. When a **column of that same name also exists**, the key means two things and the request is rejected with `AmbiguousQueryParamException` rather than silently taking the scope. List the column in `$filterable` to make it win, or rename the scope. Sorting is unaffected — `$sortScopes` keys are matched exactly, with no underscore-to-dot step
+
 *  **WITH** Returns relations and can be passed in one of 2 ways
 
 	*  `?with=[relation1,relation2]`

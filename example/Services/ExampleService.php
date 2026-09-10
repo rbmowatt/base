@@ -11,7 +11,7 @@ class ExampleService extends BaseService
      * Columns a caller may filter on with `?column=value`. Nothing is filterable
      * until it is listed here — a column existing on the table is not enough.
      */
-    protected $filterable = ['name', 'widget_type_id', 'account_type'];
+    protected $filterable = ['name', 'account_type'];
 
     /**
      * Columns a caller may pass to `?sort=`. Same rule.
@@ -30,6 +30,9 @@ class ExampleService extends BaseService
     protected $scopes = [
         'widget.type.id' => 'byWidgetType',
         //turns into $example->byWidgetType($queryParam['widget_type_id'])
+        //note widget_type_id is deliberately NOT in $filterable: a key cannot mean
+        //both the column and the scope, and listing it there would shadow this
+        //mapping. Listed in $sortable, because sorting never goes through $scopes
     ];
 
     /**

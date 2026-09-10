@@ -31,7 +31,7 @@ class MemberService extends BaseService
 
     protected $sortable = ['name'];
 
-    protected $scopes = ['tier' => 'byTier'];
+    protected $scopes = ['member.tier' => 'byTier'];
 }
 
 class FilterAllowlistTest extends TestCase
@@ -119,7 +119,8 @@ class FilterAllowlistTest extends TestCase
 
     public function testADeclaredScopeStillResolves(): void
     {
-        $results = $this->service()->where([['tier', '=', 2]]);
+        // arrives as ?member_tier=2 and maps back to the dotted scope key
+        $results = $this->service()->where([['member_tier', '=', 2]]);
 
         $this->assertSame(1, $results->count());
         $this->assertSame('alice', $results->items()->first()->name);
