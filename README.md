@@ -586,8 +586,10 @@ CI runs the same suite across PHP 8.3 and 8.4 against Laravel 11, 12 and 13 for 
 ## Static analysis
 
 ```
-vendor/bin/phpstan analyse
+composer analyse
 ```
 
 PHPStan runs at level 5 over `src`, with larastan supplying Laravel's own types so Eloquent's magic calls resolve. It runs as its own CI job and is expected to stay at zero errors.
+
+The composer script passes `--memory-limit=1G`. Larastan resolves the whole framework to read Eloquent's types and needs well past PHP's stock 128M, so `vendor/bin/phpstan analyse` on a default CLI config dies with "PHPStan process crashed because it reached configured PHP memory limit" from a parallel worker. CI never saw it because `setup-php` leaves `memory_limit` at `-1`.
 
