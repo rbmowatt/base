@@ -21,8 +21,15 @@ class QueryParser
 
   const DEFAULT_LIMIT = 20;
   const DEFAULT_PAGE = 1;
+  const MAX_LIMIT = 100;
   const SORT_DELIMITER = '_';
   const IN_CLAUSE = 'IN';
+
+  /*
+  The ceiling getLimit() clamps to. Subclass and raise it for an endpoint that
+  genuinely serves bigger pages; bind the subclass in place of QueryParser.
+  */
+  protected $maxLimit = self::MAX_LIMIT;
 
   public function __construct( Request $request )
   {
@@ -106,11 +113,16 @@ class QueryParser
   }
   /**
   * get the limit on records to be returned
+  *
+  * Clamped to $maxLimit and returned as an int. This used to hand the raw request
+  * value to paginate(): ?limit=1000000 was a one-request table dump and a memory
+  * spike, and ?limit=abc reached the paginator as the string 'abc'.
+  *
   * @return int
   */
   public function getLimit()
   {
-    return ($this->request->input('limit')) ? $this->request->input('limit') : self::DEFAULT_LIMIT;
+    return $this->boundedInt($this->request->input('limit'), self::DEFAULT_LIMIT, 1, $this->maxLimit);
   }
   /**
   * get the offest on records to be returned
@@ -118,7 +130,27 @@ class QueryParser
   */
   public function getPage()
   {
-    return $this->request->input('page') ? $this->request->input('page') : self::DEFAULT_PAGE;
+    return $this->boundedInt($this->request->input('page'), self::DEFAULT_PAGE, 1, PHP_INT_MAX);
+  }
+  /**
+  * Coerce a request value to an int inside [$min, $max].
+  *
+  * Anything non-numeric falls back to $default rather than to PHP's (int) cast,
+  * which turns 'abc' into 0 and would silently page by nothing.
+  *
+  * @param  mixed $value
+  * @param  int $default
+  * @param  int $min
+  * @param  int $max
+  * @return int
+  */
+  protected function boundedInt($value, $default, $min, $max)
+  {
+    if (!is_numeric($value))
+    {
+      return $default;
+    }
+    return max($min, min($max, (int) $value));
   }
   /**
   * get any specific select params passed

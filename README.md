@@ -297,6 +297,10 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	*  **DEFAULT** set is always **20**
 
+	* `limit` is clamped to `QueryParser::MAX_LIMIT` (100) and coerced to an int. It used to reach `paginate()` verbatim, so `?limit=1000000` was a single-request table dump and `?limit=abc` arrived as a string. Subclass `QueryParser` and raise `$maxLimit` for an endpoint that needs bigger pages
+
+	* A non-numeric `limit` or `page` falls back to the default rather than casting to `0`
+
 *  **SORT**
 
 	* Sort the results asc or desc based on a column listed in the Service's `$sortable`, or a key mapped in `$sortScopes`
