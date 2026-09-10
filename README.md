@@ -372,6 +372,8 @@ If you are upgrading an app that already consumes this package, three things cha
 
 *  `error()` defaults to a `400` status instead of `200`. Pass the status explicitly if you want something else. `exception()` still defaults to `500` and `validationError()` to `422`.
 
+*  `BaseApiController::__construct()` type-hints `ApiResponseInterface` instead of `ApiResponse`. Passing an `ApiResponse` still works. The service provider binds the interface to `ApiResponse`, so subclasses keep resolving out of the container.
+
 *  `ServiceResultsCollection::__construct()` no longer takes a model as its first argument. It never used one. Pass only the results.
 
 *  `href` comes from the container's request instead of `$_SERVER['REQUEST_URI']`, and is `null` rather than the string `N/A` when no request is bound. `$_SERVER` is process-global, so on a long-lived worker it holds whatever the process started with rather than the request being answered.
@@ -437,6 +439,16 @@ An **[ApiResponse](src/RBMowatt/Base/Rest/ApiResponse.php)** comes in a standard
 	* displays the version of the api the request is being run against
 
 	* read from `config('app.version')`, which Laravel does not set for you. Add it to `config/app.php` or the field reports `undefined`
+
+### Swapping the implementation
+
+`ApiResponse` implements **[ApiResponseInterface](src/RBMowatt/Base/Rest/Interfaces/ApiResponseInterface.php)**, and `BaseServiceProvider` binds the interface to it. To ship your own envelope, implement the interface and rebind it in your app's provider:
+
+```php
+$this->app->bind(ApiResponseInterface::class, MyApiResponse::class);
+```
+
+Controllers type-hint the interface, so nothing else changes. The envelope fields themselves are set through `__get`/`__set`, not named methods, so they are not part of the interface.
 
 ### Headers and CORS
 

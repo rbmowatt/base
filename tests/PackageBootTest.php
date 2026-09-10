@@ -21,6 +21,24 @@ class PackageBootTest extends TestCase
         $this->assertFalse(defined('STANDARD_DATE_FORMAT'));
     }
 
+    public function testTheResponseInterfaceResolvesToApiResponse(): void
+    {
+        $this->assertInstanceOf(
+            ApiResponse::class,
+            $this->app->make(\RBMowatt\Base\Rest\Interfaces\ApiResponseInterface::class)
+        );
+    }
+
+    public function testAControllerResolvesOutOfTheContainer(): void
+    {
+        $controller = $this->app->make(\RBMowatt\Base\Controllers\Api\BaseApiController::class);
+
+        $property = new \ReflectionProperty($controller, 'response');
+        $property->setAccessible(true);
+
+        $this->assertInstanceOf(ApiResponse::class, $property->getValue($controller));
+    }
+
     public function testApiResponseRendersAnEnvelope(): void
     {
         $response = (new ApiResponse())->ok(['id' => 7]);
