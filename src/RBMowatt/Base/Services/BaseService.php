@@ -37,6 +37,22 @@ abstract class BaseService implements ServiceInterface
     */
     protected $sortScopes = [];
     /*
+    Columns this service will accept as `?column=value` filters. Empty means none.
+
+    This used to be "any column on the table", which made every column a query
+    oracle: the parser turns `?password_hash=>$2y$10$K` into a real where clause,
+    `?count=true` answers it in one cheap integer, and $hidden does nothing because
+    it only governs serialization. A hash or a reset token falls to a character-at-
+    a-time binary search from that. List what callers are allowed to filter on.
+    */
+    protected $filterable = [];
+    /*
+    Columns this service will accept in `?sort=`. Empty means none, and the same
+    reasoning applies: ordering by a column the caller cannot otherwise see still
+    leaks where a row sits relative to the others.
+    */
+    protected $sortable = [];
+    /*
     By default we will attach the total count of any relations
     This is additional overhead if you don't actually need that meta info
     place any relations you don't need the count for here
@@ -75,6 +91,22 @@ abstract class BaseService implements ServiceInterface
     public function getScopes()
     {
         return $this->scopes;
+    }
+    /**
+     * Columns callers may filter on
+     * @return array<int, string>
+     */
+    public function getFilterable()
+    {
+        return $this->filterable;
+    }
+    /**
+     * Columns callers may sort by
+     * @return array<int, string>
+     */
+    public function getSortable()
+    {
+        return $this->sortable;
     }
     /**
      * Find A Single Instance based on PK ( assumes `id` )
@@ -280,7 +312,7 @@ abstract class BaseService implements ServiceInterface
             //will throw exception if sort not valid
             $this->checkValidSort($sort);
 
-            if (!in_array($sort[0], $this->getColumns()) && $scope = $this->getSortScope($sort[0])) {
+            if (!$this->isSortableColumn($sort[0]) && $scope = $this->getSortScope($sort[0])) {
                 //in this case the sort isn't based on a model property
                 //instead it needs to be passed to a scope dedicated to sort
                 $model = $model->{$scope}($sort[0], $sort[1]);
@@ -331,9 +363,22 @@ abstract class BaseService implements ServiceInterface
         }
     }
     /**
+     * Is this sort key a column the service has opened up for sorting?
+     *
+     * A false here sends the key on to getSortScope(), which throws if it is not
+     * a declared sort scope either.
+     *
+     * @param  string $key
+     * @return bool
+     */
+    protected function isSortableColumn($key)
+    {
+        return in_array($key, $this->getSortable(), true) && in_array($key, $this->getColumns());
+    }
+    /**
      * This method determines wheter a sort scope is valid
      * and will return the mapped method name if found
-     * @param  string $key 
+     * @param  string $key
      * @return string
      * @throws SortException
      */
@@ -456,7 +501,10 @@ abstract class BaseService implements ServiceInterface
      */
     protected function isScope($key)
     {
-        if (in_array($key, $this->getColumns())) {
+        // A column has to be listed AND real. Requiring both means a typo in
+        // $filterable is an InvalidQueryParamException rather than a QueryException
+        // carrying the statement back to the caller.
+        if (in_array($key, $this->getFilterable(), true) && in_array($key, $this->getColumns())) {
             return false;
         }
         $scopes = array_keys($this->getScopes());

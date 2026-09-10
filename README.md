@@ -72,6 +72,13 @@ class Widget extends BaseModel
 ```php
 class WidgetService extends BaseService
 {
+    // columns callers may filter on. Empty means none; a column being real is
+    // not enough on its own
+    protected $filterable = ['name', 'type_id'];
+
+    // columns callers may sort by
+    protected $sortable = ['name', 'type_id'];
+
     // filter params that map to a scope instead of a column
     protected $scopes = ['widget.type.id' => 'byWidgetType'];
 
@@ -262,7 +269,11 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 *  **OR EQUAL TO** is not covered yet
 
-*  *You can query on any property of the resource/model as exposed or the additional parameters described in the query parameter section of each request*
+*  *You can query on the columns the Service lists in `$filterable`, on any key it maps in `$scopes`, and on nothing else.* An unlisted key is a `400`, whether or not the column exists — the two cases are deliberately indistinguishable so the error cannot be used to walk the schema
+
+	* Filtering used to accept any column on the table. Combined with the `>` / `<` operators and `?count=true` that made every column an oracle: `?password_hash=>$2y$10$K` is a valid comparison, the count answers it, and `$hidden` does not help because it governs serialization, not the where clause. A hash or a reset token comes out of that a character at a time
+
+	* `$sortable` is the same list for `?sort=`, kept separate so a column can be orderable without being filterable
 
 *  **WITH** Returns relations and can be passed in one of 2 ways
 
@@ -282,7 +293,7 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 *  **SORT**
 
-	* Sort the results asc or desc based on an exposed resource property
+	* Sort the results asc or desc based on a column listed in the Service's `$sortable`, or a key mapped in `$sortScopes`
 
 	*  **Sort** key pattern = `{property}_{order (ASC|DESC)}`
 

@@ -31,6 +31,10 @@ class GizmoPart extends BaseModel
 
 class GizmoService extends BaseService
 {
+    protected $filterable = ['name', 'type_id'];
+
+    protected $sortable = ['name', 'type_id'];
+
     public function __construct(Gizmo $gizmo)
     {
         $this->primaryModel = $gizmo;

@@ -8,6 +8,17 @@ use RBMowatt\Base\Services\BaseService;
 class ExampleService extends BaseService
 {
     /**
+     * Columns a caller may filter on with `?column=value`. Nothing is filterable
+     * until it is listed here — a column existing on the table is not enough.
+     */
+    protected $filterable = ['name', 'widget_type_id', 'account_type'];
+
+    /**
+     * Columns a caller may pass to `?sort=`. Same rule.
+     */
+    protected $sortable = ['name', 'widget_type_id'];
+
+    /**
      * First we set up an array of filter/scope mappings
      * when any of these parameters are encountered by this service
      * the matching Scope will be added rather than adding a property filter
