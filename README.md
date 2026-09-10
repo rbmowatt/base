@@ -330,6 +330,8 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 	* A non-numeric `limit` or `page` falls back to the default rather than casting to `0`
 
+	* For the cases pagination gets in the way of — a dropdown, an export — a Service has `all()`, which returns a `ServiceResultsCollection` with no pagination metadata. It is bounded: more than `$maxUnpaginated` matching rows (default 500) throws `UnboundedResultException` rather than handing back a truncated list that looks complete. Filters and sorts go through the same allowlists
+
 *  **SORT**
 
 	* Sort the results asc or desc based on a column listed in the Service's `$sortable`, or a key mapped in `$sortScopes`

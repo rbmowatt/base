@@ -13,6 +13,7 @@ use RBMowatt\Base\Services\Exceptions\InvalidQueryParamException;
 use RBMowatt\Base\Services\Exceptions\InvalidRelationException;
 use RBMowatt\Base\Services\Exceptions\InvalidWhereFormatException;
 use RBMowatt\Base\Services\Exceptions\SortException;
+use RBMowatt\Base\Services\Exceptions\UnboundedResultException;
 use RBMowatt\Base\Services\Interfaces\ServiceInterface;
 
 
@@ -63,6 +64,11 @@ abstract class BaseService implements ServiceInterface
     a deeper path.
     */
     protected $maxRelationDepth = 3;
+    /*
+    The ceiling on all(). Not a page size — the number of rows the service is
+    willing to hand back in one unpaginated read before it refuses.
+    */
+    protected $maxUnpaginated = 500;
     /*
     The default # of results for each GET request
     */
@@ -153,6 +159,39 @@ abstract class BaseService implements ServiceInterface
         }
         //we're going to wrap this is a ServiceResultsCollection to add some functionality to make things easier for the consumer to parse
         return new ServiceResultsCollection($result);
+    }
+    /**
+     * Every matching row, for the cases pagination gets in the way of — a dropdown,
+     * an export, a lookup table.
+     *
+     * Bounded rather than unbounded. It reads $maxUnpaginated + 1 rows and throws
+     * if that many come back, so a caller who quietly outgrows the ceiling finds
+     * out instead of shipping a truncated list as if it were complete. The extra
+     * row is why this is one query and not a count followed by a select.
+     *
+     * Filters and sorts go through the same allowlists where() uses.
+     *
+     * @param array<int, mixed> $wheres
+     * @param array<int, mixed> $with
+     * @param array<int, mixed> $sorts
+     * @param array<int, string> $selects
+     * @return ServiceResultsCollection
+     * @throws UnboundedResultException
+     */
+    public function all($wheres = [], array $with = [], $sorts = [], $selects = [])
+    {
+        $model = $this->select($this->primaryModel, $selects);
+        $model = $this->setWheres($model, $wheres);
+        $model = $this->setSorts($model, $sorts);
+        $model = $this->eagerLoad($model, $with);
+
+        $rows = $model->limit($this->maxUnpaginated + 1)->get();
+
+        if ($rows->count() > $this->maxUnpaginated) {
+            throw new UnboundedResultException($this->primaryModel, $this->maxUnpaginated);
+        }
+
+        return new ServiceResultsCollection($rows);
     }
     /**
      * The path pagination links are built from, or null when there is no request.
