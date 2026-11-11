@@ -52,6 +52,15 @@ abstract class BaseService implements ServiceInterface
     */
     protected $sortable = [];
     /*
+    $filterable, $sortable, $scopes and $sortScopes for each mapped model, keyed by
+    mapping name: ['zone' => ['verdict', 'start_sec']]. A mapping with no entry is
+    default-deny, the same as an empty $filterable on the primary model.
+    */
+    protected $mappingFilterable = [];
+    protected $mappingSortable = [];
+    protected $mappingScopes = [];
+    protected $mappingSortScopes = [];
+    /*
     By default we will attach the total count of any relations
     This is additional overhead if you don't actually need that meta info
     place any relations you don't need the count for here
@@ -188,10 +197,10 @@ abstract class BaseService implements ServiceInterface
     /**
      * A copy of this service pointed at a mapped model.
      *
-     * The copy starts with no filterable, sortable or scope entries, so a mapped
-     * model is default-deny exactly like an unconfigured primary model is. The
-     * primary model's allowlists name columns on a different table and never
-     * carry over.
+     * The copy takes the mapping's own entries from $mappingFilterable,
+     * $mappingSortable, $mappingScopes and $mappingSortScopes, and nothing from
+     * the primary model: those lists name columns and scope methods on a
+     * different table.
      *
      * @param string $key
      * @return static
@@ -200,10 +209,10 @@ abstract class BaseService implements ServiceInterface
     {
         $scoped = clone $this;
         $scoped->primaryModel = $this->getMappings()[$key];
-        $scoped->filterable = [];
-        $scoped->sortable = [];
-        $scoped->scopes = [];
-        $scoped->sortScopes = [];
+        $scoped->filterable = $this->mappingFilterable[$key] ?? [];
+        $scoped->sortable = $this->mappingSortable[$key] ?? [];
+        $scoped->scopes = $this->mappingScopes[$key] ?? [];
+        $scoped->sortScopes = $this->mappingSortScopes[$key] ?? [];
 
         return $scoped;
     }

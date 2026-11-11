@@ -26,6 +26,16 @@ class SurveyQuestion extends BaseModel
     protected $fillable = ['survey_id', 'prompt'];
 
     public $timestamps = false;
+
+    public function scopeAsked($query, $value, $operator = '=')
+    {
+        return $query->where('prompt', 'like', '%' . $value . '%');
+    }
+
+    public function scopeSortByPromptLength($query, $key, $direction = 'asc')
+    {
+        return $query->orderByRaw('length(prompt) ' . $direction);
+    }
 }
 
 class SurveyCategory extends BaseModel
@@ -51,6 +61,14 @@ class SurveyService extends BaseService
     protected $filterable = ['title'];
 
     protected $sortable = ['title'];
+
+    protected $mappingFilterable = ['question' => ['survey_id', 'id']];
+
+    protected $mappingSortable = ['question' => ['prompt']];
+
+    protected $mappingScopes = ['question' => ['asked' => 'asked']];
+
+    protected $mappingSortScopes = ['question' => ['prompt_length' => 'sortByPromptLength']];
 
     public function __construct(
         protected Survey $surveyModel,
@@ -193,11 +211,62 @@ class ModelMappingsTest extends TestCase
         $service->findAnything(1);
     }
 
-    public function testTheMappedModelIsDefaultDenyOnFilters(): void
+    public function testAColumnMissingFromTheMappingAllowlistIsRejected(): void
     {
         $this->expectException(InvalidQueryParamException::class);
 
         $this->service()->whereQuestion([['prompt', '=', 'anything else']]);
+    }
+
+    public function testAMappingWithNoAllowlistIsDefaultDeny(): void
+    {
+        $this->expectException(InvalidQueryParamException::class);
+
+        $this->service()->whereCategory([['label', '=', 'churn']]);
+    }
+
+    public function testAnAllowlistedMappingColumnFilters(): void
+    {
+        $results = $this->service()->whereQuestion([['survey_id', '=', 1]]);
+
+        $this->assertSame(2, $results->getMeta('total'));
+    }
+
+    public function testAMappingScopeFilters(): void
+    {
+        $results = $this->service()->whereQuestion([['asked', '=', 'leaving']]);
+
+        $this->assertSame(1, $results->getMeta('total'));
+        $this->assertSame('why are you leaving', collect($results->items())->first()->prompt);
+    }
+
+    public function testAnAllowlistedMappingColumnSorts(): void
+    {
+        $prompts = collect($this->service()->allQuestions([], [], [['prompt', 'desc']])->items())->pluck('prompt')->all();
+
+        $this->assertSame(['why are you leaving', 'how did you hear about us', 'anything else'], $prompts);
+    }
+
+    public function testAMappingSortScopeSorts(): void
+    {
+        $prompts = collect($this->service()->allQuestions([], [], [['prompt_length', 'asc']])->items())->pluck('prompt')->all();
+
+        $this->assertSame(['anything else', 'why are you leaving', 'how did you hear about us'], $prompts);
+    }
+
+    public function testAMappingAllowlistDoesNotLeakBackToThePrimaryModel(): void
+    {
+        $service = $this->service();
+        $this->assertSame(1, $service->whereQuestion([['id', '=', 1]])->getMeta('total'));
+
+        $this->expectException(InvalidQueryParamException::class);
+
+        $service->where([['id', '=', 1]]);
+    }
+
+    public function testThePrimaryAllowlistStillAppliesToThePrimaryModel(): void
+    {
+        $this->assertSame(1, $this->service()->where([['title', '=', 'exit']])->getMeta('total'));
     }
 
     public function testThePrimaryAllowlistDoesNotCarryOverToAMapping(): void
