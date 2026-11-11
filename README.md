@@ -211,6 +211,47 @@ The **Service** is the power engine behind every **Request** and **Response**. I
 
 *  *for example the database structure could change without affecting **Controllers** and other clients of the **Service** as long as the **Service** is adjusted to account for the change.*
 
+#### Model mappings
+
+A Service can hold more models than its Primary Model: lookup tables, pivot tables and child rows that belong to it and don't deserve a Service of their own. Return them from `getMappings()`, keyed by the name the generated methods use.
+
+```php
+/**
+ * @method ReportZone|null findZone(int $id, array $with = [], array $selects = [])
+ * @method ServiceResultsCollection whereZone(array $wheres, array $with = [], array $sorts = [], array $selects = [], int $limit = 20, int $page = 1)
+ * @method ServiceResultsCollection allZones(array $wheres = [], array $with = [], array $sorts = [], array $selects = [])
+ * @method ReportZone createZone(array $params, callable|string $callback = '')
+ * @method ReportZone updateZone(ReportZone|int $entity, array $args, callable|string $callback = '')
+ * @method bool removeZone(int $id)
+ */
+class ReportService extends BaseService
+{
+    protected $filterable = ['public_token'];
+
+    protected $mappingFilterable = ['zone' => ['report_id']];
+
+    protected $mappingSortable = ['zone' => ['start_sec']];
+
+    public function __construct(protected Report $reportModel, protected ReportZone $zoneModel)
+    {
+        $this->setModel($reportModel);
+    }
+
+    public function getMappings(): array
+    {
+        return ['zone' => $this->zoneModel];
+    }
+}
+```
+
+* `find`, `where`, `all`, `create`, `update` and `remove` each get a `<Mapping>` form: `findZone()`, `whereZone()` and so on. Plurals resolve to the same mapping, so `allZones()` works.
+
+* The action has to open the method name and the mapping name has to start with a capital. Anything else is a `BadMethodCallException`.
+
+* Each call runs on a copy of the Service pointed at the mapped model. The Service's own Primary Model is never swapped, so a `findZone()` can't leave the next `find()` querying zones.
+
+* A mapped model takes its allowlists and scopes from `$mappingFilterable`, `$mappingSortable`, `$mappingScopes` and `$mappingSortScopes`, keyed by mapping name. Nothing carries over from the Primary Model, and a mapping with no entry is default-deny.
+
 ### Controllers
 
 -  **Controllers**
