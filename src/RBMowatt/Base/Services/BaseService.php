@@ -79,6 +79,10 @@ abstract class BaseService implements ServiceInterface
      */
     const SORT_ORDERS = ['ASC', 'DESC', 'asc', 'desc'];
     /**
+     * Generated method names: an action, then a mapping name starting with a capital.
+     */
+    const MAPPED_METHOD_PATTERN = '/^(find|where|all|create|update|remove)([A-Z][A-Za-z0-9]*)$/';
+    /**
      * Override the default primary model
      * @param BaseModel $model 
      */
@@ -118,6 +122,90 @@ abstract class BaseService implements ServiceInterface
     public function getSortable()
     {
         return $this->sortable;
+    }
+    /**
+     * Other models this service holds, keyed by the name its generated methods use.
+     *
+     * `['zone' => $this->zoneModel]` gives findZone(), whereZone(), allZone(),
+     * createZone(), updateZone() and removeZone(), and the plural forms
+     * (whereZones(), allZones()) resolve to the same mapping. Each call runs on
+     * a copy of the service pointed at the mapped model, so the service's own
+     * primary model is never swapped out from under the next caller.
+     *
+     * @return array<string, BaseModel>
+     */
+    public function getMappings(): array
+    {
+        return [];
+    }
+    /**
+     * Routes find<X>, where<X>, all<X>, create<X>, update<X> and remove<X> to the
+     * model mapped as `x`.
+     *
+     * The action has to open the method name and the mapping name has to start
+     * with a capital, so `findingsWhere()` or `reupdateZone()` never match by
+     * accident.
+     *
+     * @param string $method
+     * @param array<int, mixed> $args
+     * @return mixed
+     * @throws \BadMethodCallException
+     */
+    public function __call($method, $args)
+    {
+        if (preg_match(self::MAPPED_METHOD_PATTERN, $method, $parts)
+            && ($key = $this->resolveMappingKey(lcfirst($parts[2]))) !== null) {
+            return $this->forMapping($key)->{$parts[1]}(...$args);
+        }
+
+        throw new \BadMethodCallException(sprintf('Call to undefined method %s::%s()', static::class, $method));
+    }
+    /**
+     * The mapping a generated method name points at, singular or plural, or null.
+     *
+     * @param string $name
+     * @return string|null
+     */
+    protected function resolveMappingKey(string $name)
+    {
+        $mappings = $this->getMappings();
+
+        $candidates = [
+            $name,
+            preg_replace('/ies$/', 'y', $name),
+            preg_replace('/es$/', '', $name),
+            preg_replace('/s$/', '', $name),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (isset($mappings[$candidate])) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+    /**
+     * A copy of this service pointed at a mapped model.
+     *
+     * The copy starts with no filterable, sortable or scope entries, so a mapped
+     * model is default-deny exactly like an unconfigured primary model is. The
+     * primary model's allowlists name columns on a different table and never
+     * carry over.
+     *
+     * @param string $key
+     * @return static
+     */
+    protected function forMapping(string $key)
+    {
+        $scoped = clone $this;
+        $scoped->primaryModel = $this->getMappings()[$key];
+        $scoped->filterable = [];
+        $scoped->sortable = [];
+        $scoped->scopes = [];
+        $scoped->sortScopes = [];
+
+        return $scoped;
     }
     /**
      * Find A Single Instance based on PK ( assumes `id` )
