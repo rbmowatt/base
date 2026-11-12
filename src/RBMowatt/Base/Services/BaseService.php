@@ -237,7 +237,7 @@ abstract class BaseService implements ServiceInterface
      * @param array<int, mixed> $sorts A list of Sort Orders That will be applies in the order recieved
      * @param array<int, string> $selects
      * @param int $limit How many records to limit the result to
-     * @param int $page What page are we on in a pagination context ?
+     * @param int $page The page to return; the request's ?page is not consulted
      * @return ServiceResultsCollection|BaseModel|null A beefed up vesrion of Laravels Default Collection, or the single model when $wheres is a key
      */
     public function where($wheres, array $with = [], $sorts = [], $selects = [], $limit = self::DEFAULT_LIMIT, $page = self::DEFAULT_PAGE)
@@ -249,7 +249,10 @@ abstract class BaseService implements ServiceInterface
         $model = $this->setWheres($model, $wheres);
         $model = $this->setSorts($model, $sorts);
         $model = $this->eagerLoad($model, $with);
-        $result = $model->paginate($limit);
+        // The page goes in explicitly: paginate() on its own reads ?page off the
+        // current request, which belongs to whoever called the service, and is
+        // absent altogether on a queue worker or in the console.
+        $result = $model->paginate($limit, ['*'], 'page', $page);
         if ($path = $this->paginationPath())
         {
             $result = $result->withPath($path);
