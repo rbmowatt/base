@@ -407,7 +407,13 @@ A worked example lives at [example/Requests/ExampleStoreRequest.php](example/Req
 
 	* Paths are capped at `$maxRelationDepth` hops (default 3) because each hop is a query plus a count
 
-	* The relation map each hop is checked against is cached per model class for 24h, the same as `columns()`. Discovery reflects the class and builds a relation object for every relation method on it to read the related class, which is far too much to repeat per request. Add or rename a relation and clear the cache on deploy
+	* The relation map each hop is checked against is cached per model class for 24h. Discovery reflects the class and builds a relation object for every relation method on it to read the related class, which is far too much to repeat per request
+
+	* The cache key carries the path, mtime and size of every file that declares the model: the class, its ancestors and all of their traits. Add or rename a relation, on the model or in a trait it uses, and the next request reads a fresh key, no cache clear needed on deploy. Each release leaves its previous entries behind until they expire; on the database store an expired row is only removed when its key is read again, so expect one orphaned row per model per deploy unless you prune the table
+
+	* Not covered: renaming a related model's table leaves the table-qualified `fk` in the map stale until the TTL runs out. `?with=` validation does not read `fk`, only `getFk()` does
+
+	* `columns()` is still keyed by table name alone, so a migration that adds a column is not seen until its 24h entry expires or the cache is cleared
 
 	* A relation you declare is a relation callers can pull. Use `$hidden` on the related model for fields that should not travel with it
 

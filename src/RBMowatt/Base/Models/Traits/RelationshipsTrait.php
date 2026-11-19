@@ -26,8 +26,14 @@ trait RelationshipsTrait
      * Uncached that measures 0.36ms per ?with=a.b validation against 0.03ms cached.
      *
      * The map is class names, foreign keys and short type names, so it survives a
-     * cache round trip intact. Add or rename a relation and the map is stale until
-     * the TTL runs out — clear the cache on deploy, the same as columns().
+     * cache round trip intact. The key carries a fingerprint of the files that declare
+     * the class, so a deploy that changes a relation reads a fresh key instead of the
+     * previous release's map.
+     *
+     * Dropping the persistent cache for a per-process one does not pay: with opcache
+     * warm, the first discovery of a seven-relation model in a request measured
+     * 1.3-2.5ms, because every related model gets booted, against 0.06-0.09ms for a read
+     * from the database store.
      *
      * @return array<string, array<string, mixed>>
      */
@@ -49,7 +55,54 @@ trait RelationshipsTrait
     */
     protected function relationshipCacheKey()
     {
-        return 'rbmowatt_base_relations_' . md5(static::class);
+        return 'rbmowatt_base_relations_' . md5(static::class . '|' . $this->relationshipFingerprint());
+    }
+
+    /**
+     * @var array<string, string>
+     */
+    protected static $relationshipFingerprints = [];
+
+    /**
+     * Path, mtime and size of every file that declares code on this class: the class
+     * itself, each ancestor, and every trait any of them uses, nested traits included.
+     *
+     * Ancestors are in because, although a relation declared on a parent is not
+     * discovered here, a parent can change getForeignKey() or $primaryKey and with
+     * them the fk stored in the map. Related models' files are not: they only feed
+     * the table qualifier on a HasMany fk, which ?with= validation never reads, and
+     * finding them means running discovery, which is what the key exists to skip.
+     *
+     * Memoized per class for the life of the process because the code a process has
+     * loaded cannot change under it; a deploy only reaches a fresh FPM request or a
+     * restarted Octane worker, and both start with an empty map. Uncached, the
+     * stats cost ~25-45us for a BaseModel subclass's 18 files, per call.
+     *
+     * @return string
+     */
+    protected function relationshipFingerprint()
+    {
+        if (isset(static::$relationshipFingerprints[static::class])) {
+            return static::$relationshipFingerprints[static::class];
+        }
+
+        $parts = [];
+        for ($class = new ReflectionClass(static::class); $class; $class = $class->getParentClass()) {
+            $pending = [$class];
+            while ($declaring = array_pop($pending)) {
+                $file = $declaring->getFileName();
+                // eval()'d code reports a pseudo path that is not on disk
+                $parts[$declaring->getName()] = ($file !== false && is_file($file))
+                    ? $file . ':' . filemtime($file) . ':' . filesize($file)
+                    : '';
+                foreach ($declaring->getTraits() as $trait) {
+                    $pending[] = $trait;
+                }
+            }
+        }
+        ksort($parts);
+
+        return static::$relationshipFingerprints[static::class] = md5(implode('|', $parts));
     }
 
     /**
